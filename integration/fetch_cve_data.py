@@ -1,5 +1,3 @@
-from wsgiref import headers
-
 import requests
 import os
 from supabase import create_client
@@ -47,12 +45,16 @@ def fetch_cve_details(cve_id: str, kev_ids: set):
         severity = "medium"
     else:
         severity = "low"
+
+    is_kev = cve_id in kev_ids                          
+    risk_score = cvss_score + (2.0 if is_kev else 0)   
     
     return {
         "cve_id": cve_id,
         "cvss_score": cvss_score,
         "severity": severity,
-        "is_kev": cve_id in kev_ids,
+        "is_kev": is_kev,                              
+        "risk_score": round(risk_score, 2),            
         "description": vuln["descriptions"][0]["value"]
     }
 
