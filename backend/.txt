@@ -1,0 +1,35 @@
+curl.exe -X PUT 'https://ijrefswfbnsfyubddnij.supabase.co/auth/v1/admin/users/a94f4c29-adb5-4cc3-a113-59c8851dab1e' \
+  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcmVmc3dmYm5zZnl1YmRkbmlqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc3NjYzMCwiZXhwIjoyMDk5MzUyNjMwfQ.JFKf1LsF9E9jkeyI0lc1yMfvNSJZED1TsAjUW904rrc" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcmVmc3dmYm5zZnl1YmRkbmlqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc3NjYzMCwiZXhwIjoyMDk5MzUyNjMwfQ.JFKf1LsF9E9jkeyI0lc1yMfvNSJZED1TsAjUW904rrc" \
+  -H "Content-Type: application/json" \
+  -d '{"app_metadata": {"role": "admin"}}'
+
+
+curl.exe -X PUT "https://ijrefswfbnsfyubddnij.supabase.co/auth/v1/admin/users/a94f4c29-adb5-4cc3-a113-59c8851dab1e" -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcmVmc3dmYm5zZnl1YmRkbmlqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc3NjYzMCwiZXhwIjoyMDk5MzUyNjMwfQ.JFKf1LsF9E9jkeyI0lc1yMfvNSJZED1TsAjUW904rrc" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcmVmc3dmYm5zZnl1YmRkbmlqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc3NjYzMCwiZXhwIjoyMDk5MzUyNjMwfQ.JFKf1LsF9E9jkeyI0lc1yMfvNSJZED1TsAjUW904rrc" -H "Content-Type: application/json" --data-binary "@body.json"
+
+curl -X POST 'https://<your-project-ref>.supabase.co/auth/v1/token?grant_type=password' \
+  -H "apikey: <SUPABASE_ANON_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@vyuha.ai", "password": "yourpassword"}'
+
+curl.exe -X POST "https://ijrefswfbnsfyubddnij.supabase.co/auth/v1/token?grant_type=password" -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcmVmc3dmYm5zZnl1YmRkbmlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzY2MzAsImV4cCI6MjA5OTM1MjYzMH0.R7ZDjTWsR2l5unwnPPM6ii3OQmzzfaAFJng_2oKuGuA" -H "Content-Type: application/json" -d '{"email":"pavitrab2707@gmail.com","password":"pavitrab"}'
+
+
+curl -X POST http://localhost:8000/assets \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"hostname": "test-host-01", "ip_address": "10.0.0.5", "os_type": "Linux", "criticality": "high"}'
+
+
+curl.exe -X POST http://localhost:8000/assets -H "Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6IjBhYzE2Y2VlLTNmN2QtNDliMS1hNTJiLWI0Y2VjNzkyODkyMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2lqcmVmc3dmYm5zZnl1YmRkbmlqLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJhOTRmNGMyOS1hZGI1LTRjYzMtYTExMy01OWM4ODUxZGFiMWUiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzgzODcyOTY1LCJpYXQiOjE3ODM4NjkzNjUsImVtYWlsIjoicGF2aXRyYWIyNzA3QGdtYWlsLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXSwicm9sZSI6ImFkbWluIn0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzgzODY5MzY1fV0sInNlc3Npb25faWQiOiIzZTdlMTRkMi1jNDMzLTQ5NjctYWNmYy05YTZhNTdkMTk3YjQiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.q3WkMOnhekk-J95yHLus3oDUBFP3Q4bRe3Rtlsz06hUARIYpVVkHZlVoDyEMXg9Z2G2tb7Ko7NTvg52_9dW61Q" -H "Content-Type: application/json" --data-binary "@finding2.json"
+
+curl.exe -X POST http://localhost:8000/findings -H "Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6IjBhYzE2Y2VlLTNmN2QtNDliMS1hNTJiLWI0Y2VjNzkyODkyMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2lqcmVmc3dmYm5zZnl1YmRkbmlqLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJhOTRmNGMyOS1hZGI1LTRjYzMtYTExMy01OWM4ODUxZGFiMWUiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzgzODcyOTY1LCJpYXQiOjE3ODM4NjkzNjUsImVtYWlsIjoicGF2aXRyYWIyNzA3QGdtYWlsLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXSwicm9sZSI6ImFkbWluIn0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzgzODY5MzY1fV0sInNlc3Npb25faWQiOiIzZTdlMTRkMi1jNDMzLTQ5NjctYWNmYy05YTZhNTdkMTk3YjQiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.q3WkMOnhekk-J95yHLus3oDUBFP3Q4bRe3Rtlsz06hUARIYpVVkHZlVoDyEMXg9Z2G2tb7Ko7NTvg52_9dW61Q" -H "Content-Type: application/json" --data-binary "@finding.json"
+
+
+curl.exe http://localhost:8000/findings -H "Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6IjBhYzE2Y2VlLTNmN2QtNDliMS1hNTJiLWI0Y2VjNzkyODkyMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2lqcmVmc3dmYm5zZnl1YmRkbmlqLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJhOTRmNGMyOS1hZGI1LTRjYzMtYTExMy01OWM4ODUxZGFiMWUiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzgzODcyOTY1LCJpYXQiOjE3ODM4NjkzNjUsImVtYWlsIjoicGF2aXRyYWIyNzA3QGdtYWlsLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXSwicm9sZSI6ImFkbWluIn0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzgzODY5MzY1fV0sInNlc3Npb25faWQiOiIzZTdlMTRkMi1jNDMzLTQ5NjctYWNmYy05YTZhNTdkMTk3YjQiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.q3WkMOnhekk-J95yHLus3oDUBFP3Q4bRe3Rtlsz06hUARIYpVVkHZlVoDyEMXg9Z2G2tb7Ko7NTvg52_9dW61Q"
+
+
+# via Supabase dashboard table editor is easiest for one row, or:
+curl.exe -X PATCH https://ijrefswfbnsfyubddnij.supabase.co/rest/v1/findings?id=eq.5bdbdb58-7960-46c9-99ae-4fca26dfaf54 -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcmVmc3dmYm5zZnl1YmRkbmlqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc3NjYzMCwiZXhwIjoyMDk5MzUyNjMwfQ.JFKf1LsF9E9jkeyI0lc1yMfvNSJZED1TsAjUW904rrc" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcmVmc3dmYm5zZnl1YmRkbmlqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc3NjYzMCwiZXhwIjoyMDk5MzUyNjMwfQ.JFKf1LsF9E9jkeyI0lc1yMfvNSJZED1TsAjUW904rrc" -H "Content-Type: application/json" --data-binary "@update.json"
+
+curl.exe -X POST http://localhost:8000/findings -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" --data-binary "@finding2.json"

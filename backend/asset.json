@@ -1,0 +1,6 @@
+{
+  "hostname": "test-host-01",
+  "ip_address": "10.0.0.5",
+  "os_type": "Linux",
+  "criticality": "high"
+}

@@ -1,0 +1,9 @@
+{
+  "asset_id": "ade17ce6-d529-4c3a-9ee8-723d8ed92843",
+  "cve_id": "CVE-2024-5678",
+  "cvss_score": 6.8,
+  "severity": "medium",
+  "is_kev": false,
+  "description": "Local privilege escalation via sudo misconfig",
+  "vuln_category": "privilege_escalation_vuln"
+}

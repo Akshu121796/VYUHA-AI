@@ -9,14 +9,14 @@ load_dotenv()
 
 supabase = create_client(
     os.environ["SUPABASE_URL"],
-    os.environ["SUPABASE_SECRET_KEY"]   # matches your .env
+    os.environ["SUPABASE_SECRET_ROLE_KEY"]   
 )
 
 VERSION_CVE_MAP = {
     "Apache httpd 2.4.49":  ["CVE-2021-41773", "CVE-2021-42013"],
     "OpenSSH 7.4":          ["CVE-2023-38408", "CVE-2018-15473"],
     "MySQL 5.7.32":         ["CVE-2021-2307",  "CVE-2020-14765"],
-    "SimpleHTTPServer 0.6": ["CVE-2024-21762", "CVE-2023-44487"],  # your real scan
+    "SimpleHTTPServer 0.6": ["CVE-2024-21762", "CVE-2023-44487"],  
 }
 
 def get_kev_ids():
@@ -127,7 +127,7 @@ def run_import(xml_path):
             result = supabase.table("assets").insert({
                 "hostname":    host["hostname"],
                 "ip_address":  host["ip"],
-                "os_type":     "Linux",     # Kali = Linux
+                "os_type":     "Linux",     
                 "criticality": "high"
             }).execute()
             asset_id = result.data[0]["id"]
@@ -141,7 +141,7 @@ def run_import(xml_path):
             matched_cves = []
 
             for version_string, cves in VERSION_CVE_MAP.items():
-                # match any word from version string against service string
+                
                 words = version_string.split()
                 if version_string.lower() == service.lower():
                     matched_cves.extend(cves)
@@ -156,7 +156,7 @@ def run_import(xml_path):
                 cve_data = fetch_nvd(cve_id, kev_ids)
 
                 if cve_data:
-                    # skip duplicates
+                            
                     dup = supabase.table("findings") \
                         .select("id") \
                         .eq("cve_id", cve_id) \
@@ -183,6 +183,6 @@ def run_import(xml_path):
     print("Go to Supabase → Table Editor → findings to verify")
 
 if __name__ == "__main__":
-    # Run on your real Kali scan
+
     run_import("scan_output.xml")
    # run_import("sample_nmap.xml")
