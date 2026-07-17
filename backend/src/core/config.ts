@@ -9,7 +9,6 @@ function required(key: string): string {
 
 export const config = {
   supabaseUrl: required("SUPABASE_URL"),
-  supabaseJwtSecret: required("SUPABASE_JWT_SECRET"),
   supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
   port: parseInt(process.env.PORT || "8000"),
   groqApiKey: required("GROQ_API_KEY"),

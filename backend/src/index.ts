@@ -7,7 +7,7 @@ import attackPathsRoutes from "./routes/attackPaths";
 import approvalsRoutes from "./routes/approvals";
 import copilotRoutes from "./routes/copilot";
 import auditLogRoutes from "./routes/auditLog";
-
+import dashboardRoutes from "./routes/dashboard";
 
 const app = Fastify({ logger: true });
 
@@ -22,6 +22,7 @@ async function main() {
   await app.register(approvalsRoutes);
   await app.register(copilotRoutes);
   await app.register(auditLogRoutes);
+  await app.register(dashboardRoutes);
   await app.listen({ port: config.port, host: "0.0.0.0" });
 }
 
