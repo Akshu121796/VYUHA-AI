@@ -28,6 +28,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../utils/cn";
 import { toast } from "sonner";
+import { useAttackGraphData } from "../../hooks/queries/useVyuhaQueries";
 
 // Node Interface details
 interface AttackNodeData {
@@ -42,8 +43,24 @@ interface AttackNodeData {
   mitigations: string[];
 }
 
+// Icon mapping registry for backend-driven serialization keys
+const ICON_MAP: Record<string, React.ReactNode> = {
+  "key": <Key className="h-4 w-4" />,
+  "terminal": <Terminal className="h-4 w-4" />,
+  "shield-alert": <ShieldAlert className="h-4 w-4 animate-pulse" />,
+  "network": <Network className="h-4 w-4" />,
+  "shield-check": <ShieldCheck className="h-4 w-4" />
+};
+
 // Custom React Flow Node Component
 const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
+  const renderIcon = () => {
+    if (typeof data.icon === "string") {
+      return ICON_MAP[data.icon] || <ShieldAlert className="h-4 w-4" />;
+    }
+    return data.icon;
+  };
+
   return (
     <div className={cn(
       "px-4 py-3 rounded-md bg-white border flex items-center space-x-3 text-left max-w-[220px] select-none group relative transition-premium shadow-card hover:shadow-premium",
@@ -53,7 +70,7 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
       data.severity === "low" && "border-slate-200 hover:border-cyber-low shadow-[0_4px_12px_rgba(34,197,94,0.05)]"
     )}>
       {/* Target port connections */}
-      {data.id !== "weak-credentials" && (
+      {data.id !== "node-1" && data.id !== "weak-credentials" && (
         <Handle 
           type="target" 
           position={Position.Left} 
@@ -78,7 +95,7 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
         data.severity === "medium" && "bg-yellow-50 border-yellow-100 text-cyber-medium",
         data.severity === "low" && "bg-green-50 border-green-100 text-cyber-low"
       )}>
-        {data.icon}
+        {renderIcon()}
       </div>
 
       {/* Node details */}
@@ -92,7 +109,7 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
       </div>
 
       {/* Source port connections */}
-      {data.id !== "domain-admin" && (
+      {data.id !== "node-5" && data.id !== "domain-admin" && (
         <Handle 
           type="source" 
           position={Position.Right} 
@@ -112,161 +129,55 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
 
 export function AttackGraphPage() {
   const navigate = useNavigate();
+  const { data: graphData, isLoading } = useAttackGraphData();
 
   // Custom components registration for React Flow
   const nodeTypes = useMemo(() => ({
     attackNode: CustomAttackNode
   }), []);
 
-  // Attack sequence data mapping
-  const initialNodesData: AttackNodeData[] = [
-    {
-      id: "weak-credentials",
-      subtitle: "Initial Access",
-      label: "Weak Credentials",
-      severity: "high",
-      icon: <Key className="h-4 w-4" />,
-      tooltip: "External SSH login logged on web-prod-ubuntu-01 matching public dictionaries.",
-      ip: "185.220.101.44 (WAN)",
-      description: "Threat actor performed credential brute-forcing targeting active directory external accounts. Credentials matching administrative wordlists were successfully authenticated.",
-      mitigations: [
-        "Deploy Palo Alto IP firewall block",
-        "Enforce active multi-factor verification",
-        "Force domain credentials rollback"
-      ]
-    },
-    {
-      id: "privilege-escalation",
-      subtitle: "Privilege Escalation",
-      label: "Privilege Escalation",
-      severity: "critical",
-      icon: <Terminal className="h-4 w-4" />,
-      tooltip: "Exploitation of CVE-2024-3094 to execute bash root shells on web-prod-ubuntu-01.",
-      ip: "web-prod-ubuntu-01 (10.120.40.8)",
-      description: "Attacker exploited a supply-chain backdoor (CVE-2024-3094) inside xz-utils compilation. Backdoor hooks enabled remote root terminal commands execution without security checks.",
-      mitigations: [
-        "Quarantine host web-prod-ubuntu-01",
-        "Roll back library dependencies to 5.4.1",
-        "Terminate active bash console processes"
-      ]
-    },
-    {
-      id: "credential-dumping",
-      subtitle: "Credential Access",
-      label: "Credential Dumping",
-      severity: "critical",
-      icon: <ShieldAlert className="h-4 w-4 animate-pulse" />,
-      tooltip: "LSASS process memory read handles queried on ad-dc-windows-01 domain server.",
-      ip: "ad-dc-windows-01 (10.120.40.2)",
-      description: "Attacker executed administrative LSASS memory dumps on the Active Directory domain controller workstation. Process credentials retrieved to obtain domain keys.",
-      mitigations: [
-        "Enable LSA protection registry keys",
-        "Invalidate DC Kerberos auth keys",
-        "Quarantine host ad-dc-windows-01"
-      ]
-    },
-    {
-      id: "lateral-movement",
-      subtitle: "Lateral Movement",
-      label: "Lateral Movement",
-      severity: "high",
-      icon: <Network className="h-4 w-4" />,
-      tooltip: "Secured RDP connections logged between web server groups and domain controller hosts.",
-      ip: "VLAN-Segment (10.120.40.0/24)",
-      description: "Attacker leveraged compromised credentials to establish internal RDP sessions from web production segments into domain management segments.",
-      mitigations: [
-        "Sever RDP session routes",
-        "Enforce localized firewall segment blocks",
-        "Trigger credentials rollbacks"
-      ]
-    },
-    {
-      id: "domain-admin",
-      subtitle: "Exfiltration & Impact",
-      label: "Domain Admin",
-      severity: "critical",
-      icon: <ShieldCheck className="h-4 w-4" />,
-      tooltip: "Threat actor captures Domain Admin registry credentials. Full domain compromise imminent.",
-      ip: "ad-dc-windows-01 (Active Directory Forest)",
-      description: "Threat actor achieves full Domain Controller authorization, gaining unrestricted administrative read/write access controls over local directory assets.",
-      mitigations: [
-        "Execute disaster recovery schemas",
-        "Trigger global SOC incident responses",
-        "Invalidate active directory trust forest"
-      ]
+  const [selectedNodeId, setSelectedNodeId] = useState<string>("");
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
+  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
+
+  // Sync React Flow state with query data
+  React.useEffect(() => {
+    if (graphData?.nodes) {
+      setRfNodes(graphData.nodes);
     }
-  ];
-
-  const [selectedNodeId, setSelectedNodeId] = useState<string>("privilege-escalation");
-
-  // React Flow initial nodes setup
-  const initialNodes = initialNodesData.map(node => ({
-    id: node.id,
-    type: "attackNode",
-    data: node,
-    position: 
-      node.id === "weak-credentials" ? { x: 40, y: 150 } :
-      node.id === "privilege-escalation" ? { x: 280, y: 150 } :
-      node.id === "credential-dumping" ? { x: 520, y: 40 } :
-      node.id === "lateral-movement" ? { x: 520, y: 260 } :
-      { x: 760, y: 150 }
-  }));
-
-  // React Flow initial edges setup
-  const initialEdges = [
-    { 
-      id: "e-weak-priv", 
-      source: "weak-credentials", 
-      target: "privilege-escalation", 
-      animated: true,
-      style: { stroke: "#f59e0b", strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#f59e0b" }
-    },
-    { 
-      id: "e-priv-dump", 
-      source: "privilege-escalation", 
-      target: "credential-dumping", 
-      animated: true,
-      style: { stroke: "#ef4444", strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#ef4444" }
-    },
-    { 
-      id: "e-priv-lat", 
-      source: "privilege-escalation", 
-      target: "lateral-movement", 
-      animated: true,
-      style: { stroke: "#f59e0b", strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#f59e0b" }
-    },
-    { 
-      id: "e-dump-admin", 
-      source: "credential-dumping", 
-      target: "domain-admin", 
-      animated: true,
-      style: { stroke: "#ef4444", strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#ef4444" }
-    },
-    { 
-      id: "e-lat-admin", 
-      source: "lateral-movement", 
-      target: "domain-admin", 
-      animated: true,
-      style: { stroke: "#ef4444", strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#ef4444" }
+    if (graphData?.edges) {
+      setRfEdges(graphData.edges);
     }
-  ];
-
-  const [rfNodes, setRfNodes, onNodesChange] = useNodesState(initialNodes);
-  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(initialEdges);
+    if (graphData?.nodes && graphData.nodes.length > 0) {
+      // Default to privilege-escalation or second node if present, else first
+      const defaultNode = graphData.nodes.find((n: any) => n.id === "privilege-escalation" || n.id === "node-2") || graphData.nodes[0];
+      setSelectedNodeId(defaultNode.id);
+    }
+  }, [graphData, setRfNodes, setRfEdges]);
 
   // Retrieve selected node context
   const selectedNode = useMemo(() => {
-    return initialNodesData.find(n => n.id === selectedNodeId) || initialNodesData[1];
-  }, [selectedNodeId]);
+    if (!graphData?.nodes) return null;
+    const node = graphData.nodes.find((n: any) => n.id === selectedNodeId) || graphData.nodes[0];
+    return node ? node.data : null;
+  }, [selectedNodeId, graphData]);
 
   const handleTriggerPlaybook = (mitigation: string) => {
     toast.success(`Action successfully initialized: "${mitigation}"`);
   };
+
+  if (isLoading || !graphData) {
+    return (
+      <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] justify-center items-center font-mono">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyber-primary" />
+        <p className="text-xs text-slate-400 mt-3">Loading dynamic attack paths...</p>
+      </div>
+    );
+  }
+
+  if (!selectedNode) {
+    return null;
+  }
 
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-100px)]">
@@ -381,7 +292,7 @@ export function AttackGraphPage() {
               </h4>
               
               <div className="space-y-2">
-                {selectedNode.mitigations.map((mit, idx) => (
+                {selectedNode.mitigations.map((mit: string, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => handleTriggerPlaybook(mit)}
