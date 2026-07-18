@@ -15,6 +15,7 @@ import { Card, CardContent } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../utils/cn";
+import { useCopilotMutation, useEndpointsData } from "../../hooks/queries/useVyuhaQueries";
 
 // Conversational interface types
 interface Message {
@@ -35,6 +36,9 @@ export function CopilotPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: assets } = useEndpointsData();
+  const copilotMutation = useCopilotMutation();
 
   // Thread History list state
   const [threads, setThreads] = useState<Thread[]>([
@@ -76,62 +80,8 @@ export function CopilotPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Bot mock conversational engine mapping responses
-  const getMockResponse = (query: string): Message => {
-    const q = query.toLowerCase();
-    
-    if (q.includes("xz-utils") || q.includes("xz")) {
-      return {
-        role: "assistant",
-        content: "### VYUHA.AI SOC Triage Report\nActive indicators of **CVE-2024-3094** (xz-utils supply-chain backdoor) detected on endpoint **web-prod-ubuntu-01**.\n\n*   **Vulnerability status**: CRITICAL (CVSS Score 10.0)\n*   **Active Exploit**: Attacker SSH shell established over root library hooks.\n*   **Mitigation Playbook**: I recommend quarantining the host immediately and running dependency rollback scripts.",
-        codeBlock: {
-          language: "bash",
-          code: "# Quarantine host at active gateway\niptables -A INPUT -s 10.120.40.8 -j DROP\n# Roll back system xz-utils library\napt-get install --reinstall xz-utils=5.4.1"
-        },
-        referenceCard: {
-          hostname: "web-prod-ubuntu-01",
-          ip: "10.120.40.8",
-          cve: "CVE-2024-3094",
-          severity: "critical"
-        }
-      };
-    }
-    
-    if (q.includes("lsass") || q.includes("credential")) {
-      return {
-        role: "assistant",
-        content: "### VYUHA.AI SOC Triage Report\nCritical alert logged: **LSASS memory handle read request** flagged on domain controller **ad-dc-windows-01**.\n\n*   **Alert Category**: Credential Dumping (Mitre ATT&CK T1003.001)\n*   **Severity**: CRITICAL\n*   **Assessment**: Attacker queried LSASS process memory handles to dump domain Kerberos keys.\n*   **Mitigation Playbook**: Restrict NT administrative access to LSA protection scopes.",
-        codeBlock: {
-          language: "powershell",
-          code: "# Enable LSA Protection via Registry Key\nNew-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa' -Name 'RunAsPPL' -Value 1 -PropertyType DWORD -Force"
-        },
-        referenceCard: {
-          hostname: "ad-dc-windows-01",
-          ip: "10.120.40.2",
-          severity: "critical"
-        }
-      };
-    }
-
-    if (q.includes("block") || q.includes("ip")) {
-      return {
-        role: "assistant",
-        content: "### Firewall Containment Playbook\nTo block malicious external campaigns originating from WAN IP **185.220.101.44**, deploy Palo Alto edge boundary rule block.\n\n*   **Target Scope**: Pal Alto boundary edge firewalls\n*   **Containment Status**: Deployed rule blocking traffic from WAN source address.",
-        codeBlock: {
-          language: "bash",
-          code: "# Block Attacker IP in Edge routing rules\ncurl -X POST https://paloalto.internal/api/rules -d 'source=185.220.101.44&action=deny'"
-        }
-      };
-    }
-
-    return {
-      role: "assistant",
-      content: `I've analyzed your query: "${query}". I suggest reviewing the active threat detection timelines on the main posturing dashboard or deploying localized containment playbooks in the approval queue.`
-    };
-  };
-
   const handleSendPrompt = (queryText: string) => {
-    if (!queryText.trim()) return;
+    if (!queryText.trim() || isTyping) return;
 
     // Append User Message
     const userMsg: Message = { role: "user", content: queryText };
@@ -139,53 +89,92 @@ export function CopilotPage() {
     setInput("");
     setIsTyping(true);
 
-    // Bot Typing & Streaming Simulation
-    setTimeout(() => {
-      setIsTyping(false);
-      const rawBotResponse = getMockResponse(queryText);
-      
-      // Emulate sentence-by-sentence streaming increments
-      const sentences = rawBotResponse.content.split("\n");
-      let currentSentenceIndex = 0;
-      
-      const streamMsg: Message = {
-        role: "assistant",
-        content: "",
-        isStreaming: true
-      };
-      
-      setMessages(prev => [...prev, streamMsg]);
+    copilotMutation.mutate(queryText, {
+      onSuccess: (data: any) => {
+        setIsTyping(false);
+        const { answer } = data;
 
-      const interval = setInterval(() => {
-        if (currentSentenceIndex < sentences.length) {
-          const chunk = sentences.slice(0, currentSentenceIndex + 1).join("\n");
-          setMessages(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last && last.role === "assistant") {
-              last.content = chunk;
-            }
-            return updated;
-          });
-          currentSentenceIndex++;
-        } else {
-          // Finished streaming, attach metadata references (code, cards)
-          clearInterval(interval);
-          setMessages(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last && last.role === "assistant") {
-              last.content = rawBotResponse.content;
-              last.isStreaming = false;
-              last.codeBlock = rawBotResponse.codeBlock;
-              last.referenceCard = rawBotResponse.referenceCard;
-            }
-            return updated;
-          });
+        // Parse code blocks from Markdown content
+        const match = answer.match(/```(\w+)?\n([\s\S]+?)\n```/);
+        let codeBlock: { language: string; code: string } | undefined;
+        let cleanContent = answer;
+        if (match) {
+          codeBlock = {
+            language: match[1] || "bash",
+            code: match[2].trim()
+          };
+          cleanContent = answer.replace(/```(\w+)?\n([\s\S]+?)\n```/g, "").trim();
         }
-      }, 150);
-      
-    }, 800);
+
+        // Dynamically find host references in the response text
+        const matchedAsset = assets?.find((a: any) => 
+          answer.toLowerCase().includes(a.hostname.toLowerCase()) || 
+          answer.toLowerCase().includes(a.ip.toLowerCase())
+        );
+
+        let referenceCard: { hostname: string; ip: string; cve?: string; severity: "critical" | "high" | "medium" | "low" } | undefined;
+        if (matchedAsset) {
+          const maxCve = matchedAsset.cves?.[0]?.id;
+          referenceCard = {
+            hostname: matchedAsset.hostname,
+            ip: matchedAsset.ip,
+            cve: maxCve,
+            severity: matchedAsset.criticalAlertsCount > 0 ? "critical" as const : matchedAsset.highAlertsCount > 0 ? "high" as const : "medium" as const
+          };
+        }
+
+        // Emulate streaming increments for typing effect
+        const sentences = cleanContent.split("\n");
+        let currentSentenceIndex = 0;
+
+        const streamMsg: Message = {
+          role: "assistant",
+          content: "",
+          isStreaming: true
+        };
+        
+        setMessages(prev => [...prev, streamMsg]);
+
+        const interval = setInterval(() => {
+          if (currentSentenceIndex < sentences.length) {
+            const chunk = sentences.slice(0, currentSentenceIndex + 1).join("\n");
+            setMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                last.content = chunk;
+              }
+              return updated;
+            });
+            currentSentenceIndex++;
+          } else {
+            clearInterval(interval);
+            setMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                last.content = cleanContent;
+                last.isStreaming = false;
+                last.codeBlock = codeBlock;
+                last.referenceCard = referenceCard;
+              }
+              return updated;
+            });
+          }
+        }, 80);
+      },
+      onError: (err: any) => {
+        setIsTyping(false);
+        const errMsg = err?.response?.data?.error || err?.message || "RAG Copilot Pipeline failed.";
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `Failed to query Security Copilot: ${errMsg}`
+          }
+        ]);
+      }
+    });
   };
 
   const handleCreateNewChat = () => {
