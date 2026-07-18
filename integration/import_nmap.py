@@ -4,6 +4,7 @@ import os
 from supabase import create_client
 from dotenv import load_dotenv
 import time
+from classifier import classify_vuln
 
 load_dotenv()
 
@@ -145,7 +146,7 @@ def run_import(xml_path):
                 words = version_string.split()
                 if version_string.lower() == service.lower():
                     matched_cves.extend(cves)
-                    print(f"  Matched '{version_string}' → {cves}")
+                    print(f"  Matched '{version_string}' -> {cves}")
 
             if not matched_cves:
                 print(f"  No CVE match for service: {service}")
@@ -162,15 +163,21 @@ def run_import(xml_path):
                         .eq("cve_id", cve_id) \
                         .eq("asset_id", asset_id) \
                         .execute()
-
                     if dup.data:
-                        print(f"  ⚠ Duplicate — skipping {cve_id}")
+                        print(f"  [WARN] Duplicate - skipping {cve_id}")
                     else:
+                        vuln_category = classify_vuln(
+                            supabase,
+                            description=cve_data.get("description"),
+                            service_name=service,
+                            title=cve_id
+                        )
                         supabase.table("findings").insert({
                             "asset_id": asset_id,
+                            "vuln_category": vuln_category,
                             **cve_data
                         }).execute()
-                        print(f"  ✓ {cve_id} | "
+                        print(f"  [OK] {cve_id} | "
                               f"{cve_data['severity'].upper()} | "
                               f"CVSS: {cve_data['cvss_score']} | "
                               f"KEV: {cve_data['is_kev']} | "
@@ -179,8 +186,8 @@ def run_import(xml_path):
 
                 time.sleep(0.6)  # NVD rate limit — do not remove
 
-    print(f"\n✅ Done — {total} findings inserted")
-    print("Go to Supabase → Table Editor → findings to verify")
+    print(f"\n[INFO] Done - {total} findings inserted")
+    print("Go to Supabase -> Table Editor -> findings to verify")
 
 if __name__ == "__main__":
 

@@ -42,12 +42,13 @@ import xml.etree.ElementTree as ET
 from supabase import create_client
 from dotenv import load_dotenv
 import requests
+from classifier import classify_vuln
 
 load_dotenv()
 
 supabase = create_client(
     os.environ["SUPABASE_URL"],
-    os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+    os.environ["SUPABASE_SECRET_ROLE_KEY"]
 )
 
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -242,7 +243,7 @@ def run_import(xml_path):
                         .eq("asset_id", asset_id) \
                         .execute()
                     if dup.data:
-                        print(f"  ⚠ Duplicate — skipping {cve_id}")
+                        print(f"  [WARN] Duplicate - skipping {cve_id}")
                         continue
 
                     print(f"  Fetching {cve_id} from NVD...")
@@ -259,11 +260,18 @@ def run_import(xml_path):
                             "description": finding["description"][:500] or finding["nvt_name"],
                         }
 
+                    vuln_category = classify_vuln(
+                        supabase,
+                        description=cve_data.get("description"),
+                        service_name=finding.get("port"),
+                        title=finding.get("nvt_name") or cve_id
+                    )
                     supabase.table("findings").insert({
                         "asset_id": asset_id,
+                        "vuln_category": vuln_category,
                         **cve_data
                     }).execute()
-                    print(f"  ✓ {cve_id} | {cve_data['severity'].upper()} | "
+                    print(f"  [OK] {cve_id} | {cve_data['severity'].upper()} | "
                           f"CVSS: {cve_data['cvss_score']} | KEV: {cve_data['is_kev']}")
                     total += 1
                     time.sleep(0.6)  # NVD rate limit — do not remove
@@ -275,6 +283,13 @@ def run_import(xml_path):
                     "Critical": 9.0, "High": 7.5, "Medium": 5.0, "Low": 2.0
                 }.get(finding["threat"], 5.0)
 
+                desc = f"{finding['nvt_name']}: {finding['description'][:400]}"
+                vuln_category = classify_vuln(
+                    supabase,
+                    description=finding.get("description"),
+                    service_name=finding.get("port"),
+                    title=finding.get("nvt_name")
+                )
                 supabase.table("findings").insert({
                     "asset_id": asset_id,
                     "cve_id": None,
@@ -282,13 +297,14 @@ def run_import(xml_path):
                     "severity": THREAT_TO_SEVERITY.get(finding["threat"], "medium"),
                     "is_kev": False,
                     "risk_score": cvss,
-                    "description": f"{finding['nvt_name']}: {finding['description'][:400]}",
+                    "description": desc,
+                    "vuln_category": vuln_category,
                 }).execute()
-                print(f"  ✓ {finding['nvt_name']} | {finding['threat'].upper()} | no CVE (NVT finding)")
+                print(f"  [OK] {finding['nvt_name']} | {finding['threat'].upper()} | no CVE (NVT finding)")
                 total += 1
 
-    print(f"\n✅ Done — {total} findings inserted")
-    print("Go to Supabase → Table Editor → findings to verify")
+    print(f"\n[INFO] Done - {total} findings inserted")
+    print("Go to Supabase -> Table Editor -> findings to verify")
 
 
 if __name__ == "__main__":

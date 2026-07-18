@@ -8,11 +8,17 @@ import approvalsRoutes from "./routes/approvals";
 import copilotRoutes from "./routes/copilot";
 import auditLogRoutes from "./routes/auditLog";
 import dashboardRoutes from "./routes/dashboard";
+import reportsRoutes from "./routes/reports";
+import settingsRoutes from "./routes/settings";
 
 const app = Fastify({ logger: true });
 
 async function main() {
-  await app.register(cors, { origin: "*" }); // tighten before demo if time allows
+  await app.register(cors, {
+    origin: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
 
   app.get("/health", async () => ({ status: "ok" }));
 
@@ -23,6 +29,8 @@ async function main() {
   await app.register(copilotRoutes);
   await app.register(auditLogRoutes);
   await app.register(dashboardRoutes);
+  await app.register(reportsRoutes);
+  await app.register(settingsRoutes);
   await app.listen({ port: config.port, host: "0.0.0.0" });
 }
 

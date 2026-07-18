@@ -5,9 +5,27 @@ export const approvalService = {
     const res = await apiClient.get("/approvals");
     return res.data;
   },
-  resolveTask: async (id: string, status: "approved" | "rejected") => {
-    const res = await apiClient.put(`/approvals/${id}`, { status });
+
+  decide: async (
+    id: string,
+    decision: "approved" | "rejected"
+  ) => {
+    const res = await apiClient.patch(
+      `/approvals/${id}/decide`,
+      { decision }
+    );
+    return res.data;
+  },
+
+  apply: async (id: string) => {
+    const res = await apiClient.post(`/approvals/${id}/apply`);
+    return res.data;
+  },
+
+  verify: async (id: string) => {
+    const res = await apiClient.post(`/approvals/${id}/verify`);
     return res.data;
   }
 };
+
 export default approvalService;

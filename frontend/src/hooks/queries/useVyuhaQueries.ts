@@ -28,7 +28,7 @@ export function useIncidentsData() {
 export function useUpdateIncidentMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: IncidentStatus }) => 
+    mutationFn: ({ id, status }: { id: string; status: IncidentStatus }) =>
       findingsService.updateIncidentStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
@@ -68,7 +68,7 @@ export function useToggleIsolationMutation() {
 export function useTerminateProcessMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, pid }: { id: string; pid: number }) => 
+    mutationFn: ({ id, pid }: { id: string; pid: number }) =>
       endpointService.terminateProcess(id, pid),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["endpoint", data.id] });
@@ -101,9 +101,11 @@ export function useApprovalsData() {
 
 export function useResolveApprovalMutation() {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: "approved" | "rejected" }) => 
-      approvalService.resolveTask(id, status),
+    mutationFn: ({ id, status }: { id: string; status: "approved" | "rejected" }) =>
+      approvalService.decide(id, status),
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["approvals"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
