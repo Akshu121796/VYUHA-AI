@@ -4,7 +4,8 @@
     "scripts": {
         "frontend": "cd frontend && npm run dev",
         "backend": "cd backend && npm run dev",
-        "dev": "concurrently -n FRONTEND,BACKEND -c blue,green \"npm run backend\" \"npm run frontend\""
+        "dev": "concurrently -n FRONTEND,BACKEND -c blue,green \"npm run backend\" \"npm run frontend\"",
+        "build": "npm run build --prefix frontend && npm run build --prefix backend"
     },
     "devDependencies": {
         "concurrently": "^9.0.0"
