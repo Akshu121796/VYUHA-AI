@@ -8,17 +8,17 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 
 
 # Features
-- 🔍 Import vulnerability scans from **Nmap** and **OpenVAS**
-- ⚠️ Automatic CVE enrichment using **NVD API**
-- 🚨 CISA KEV exploitability detection
-- 📊 Intelligent risk scoring
-- 🗺️ Interactive Attack Path Visualization
-- 🤖 AI Security Copilot
-- 💻 Endpoint Monitoring Dashboard
-- 📑 Human Approval Workflow
-- 📄 Executive PDF & CSV Reports
-- 🔔 Live Notifications
-- 🔐 JWT Authentication & Role-Based Access Control
+-  Import vulnerability scans from **Nmap** and **OpenVAS**
+-  Automatic CVE enrichment using **NVD API**
+-  CISA KEV exploitability detection
+-  Intelligent risk scoring
+-  Interactive Attack Path Visualization
+-  AI Security Copilot
+-  Endpoint Monitoring Dashboard
+-  Human Approval Workflow
+-  Executive PDF & CSV Reports
+-  Live Notifications
+-  JWT Authentication & Role-Based Access Control
 
 
 #  System Architecture
@@ -43,8 +43,8 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 ```
 
 
-# 🛠️ Tech Stack
-## Frontend
+## Tech Stack
+# Frontend
 
 - React 18
 - TypeScript
@@ -55,14 +55,14 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 - Recharts
 - Framer Motion
 
-## Backend
+# Backend
 
 - Node.js
 - Fastify
 - Supabase (PostgreSQL)
 - JWT Authentication
 
-## AI & Threat Intelligence
+# AI & Threat Intelligence
 
 - Groq (Llama 3.3)
 - ChromaDB
@@ -73,11 +73,9 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 - OpenVAS
 - Nmap
 
----
 
 # 📂 Project Structure
 ```text
-## 📂 Project Structure
 VYUHA-AI/
 │
 ├── frontend/
@@ -117,10 +115,8 @@ VYUHA-AI/
 └── .env.example
 ```
 
----
-
-# 🚀 Installation
-## Clone Repository
+## Installation
+# Clone Repository
 
 ```bash
 git clone https://github.com/Akshu121796/VYUHA-AI.git
@@ -128,7 +124,7 @@ cd VYUHA-AI
 ```
 
 ---
-## Install Dependencies
+# Install Dependencies
 
 ```bash
 npm install
@@ -136,7 +132,7 @@ npm install
 
 ---
 
-## Configure Environment
+# Configure Environment
 
 Create a `.env` file.
 ```env
@@ -147,9 +143,7 @@ GROQ_API_KEY=
 NVD_API_KEY=
 ```
 
----
-## Run the Project
-
+# Run the Project
 ```bash
 npm run dev
 ```
@@ -159,7 +153,7 @@ This starts:
 
 ---
 
-# 📸 Application Modules
+#  Application Modules
 
 - Dashboard
 - Findings
@@ -170,9 +164,7 @@ This starts:
 - Reports
 - Settings
 
----
-
-# 🎯 Demo Workflow
+## Demo Workflow
 
 1. Import Nmap/OpenVAS Scan
 2. Parse and Normalize Findings
@@ -183,9 +175,8 @@ This starts:
 7. Approve Remediation
 8. Export Executive Reports
 
----
 
-# 🔐 Security Highlights
+## Security Highlights
 - Human-in-the-loop remediation
 - Role-Based Access Control (RBAC)
 - JWT Authentication
@@ -194,9 +185,8 @@ This starts:
 - Attack Path Correlation
 - AI-assisted Investigation
 
----
 
-# 🛣️ Future Roadmap
+#  Future Roadmap
 
 - SIEM Integration
 - Compliance Mapping
@@ -206,9 +196,7 @@ This starts:
 - Malware Sandbox Integration
 - Cloud Asset Discovery
 
----
-
-# 👥 Team
+#  Team
 
 | Name | Role |
 |------|------|
@@ -217,9 +205,8 @@ This starts:
 | Pavitra Boga | Backend |
 | Paras Kumbhkar | AI/ML |
 
----
 
-# 📄 License
+#  License
 This project is licensed under the **MIT License**.
 
 ---
