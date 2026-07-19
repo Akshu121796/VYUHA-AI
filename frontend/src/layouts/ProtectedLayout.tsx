@@ -6,6 +6,7 @@ import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { CommandMenu } from "../components/CommandMenu";
 import { mockCopilotAnswers } from "../services/mockData";
+import { copilotService } from "../services/copilotService";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { cn } from "../utils/cn";
@@ -122,34 +123,41 @@ export function ProtectedLayout() {
     setCopilotInput("");
     setIsCopilotTyping(true);
 
-    setTimeout(() => {
-      setIsCopilotTyping(false);
-      const cleaned = contentText.toLowerCase();
-      let response: { role: "assistant"; content: string; code?: string; language?: string; actions?: any[] } = {
-        role: "assistant" as const,
-        content: `I've received your query: "${contentText}". I will monitor system process queues and quarantine vectors.`
-      };
+    copilotService.sendPrompt(contentText)
+      .then((data) => {
+        setIsCopilotTyping(false);
+        const answer = data.answer || "";
+        
+        // Parse markdown code blocks in answer if present
+        const match = answer.match(/```(\w+)?\n([\s\S]+?)\n```/);
+        let codeBlock: string | undefined;
+        let codeLang: string | undefined;
+        let cleanContent = answer;
+        if (match) {
+          codeLang = match[1] || "bash";
+          codeBlock = match[2].trim();
+          cleanContent = answer.replace(/```(\w+)?\n([\s\S]+?)\n```/g, "").trim();
+        }
 
-      if (cleaned.includes("xz") || cleaned.includes("backdoor")) {
-        response = {
-          role: "assistant" as const,
-          content: mockCopilotAnswers["analyze xz-backdoor vulnerability"].text,
-          code: mockCopilotAnswers["analyze xz-backdoor vulnerability"].code,
-          language: mockCopilotAnswers["analyze xz-backdoor vulnerability"].language,
-          actions: mockCopilotAnswers["analyze xz-backdoor vulnerability"].actions
-        };
-      } else if (cleaned.includes("lsass") || cleaned.includes("dump")) {
-        response = {
-          role: "assistant" as const,
-          content: mockCopilotAnswers["review lsass memory dump"].text,
-          code: mockCopilotAnswers["review lsass memory dump"].code,
-          language: mockCopilotAnswers["review lsass memory dump"].language,
-          actions: mockCopilotAnswers["review lsass memory dump"].actions
-        };
-      }
-
-      setChatMessages(prev => [...prev, response]);
-    }, 800);
+        setChatMessages(prev => [
+          ...prev, 
+          { 
+            role: "assistant" as const, 
+            content: cleanContent, 
+            code: codeBlock, 
+            language: codeLang,
+            actions: [] 
+          }
+        ]);
+      })
+      .catch((err) => {
+        setIsCopilotTyping(false);
+        console.error(err);
+        setChatMessages(prev => [
+          ...prev,
+          { role: "assistant" as const, content: "Error communicating with AI Copilot agent. Check backend operations." }
+        ]);
+      });
   };
 
   const handleCopilotAction = (act: any) => {

@@ -7,6 +7,7 @@ import { copilotService } from "../../services/copilotService";
 import { approvalService } from "../../services/approvalService";
 import { reportsService } from "../../services/reportsService";
 import { settingsService } from "../../services/settingsService";
+import { notificationsService } from "../../services/notificationsService";
 import { IncidentStatus } from "../../types";
 
 // 1. Dashboard queries hook
@@ -146,5 +147,14 @@ export function useUpdateSettingsMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     }
+  });
+}
+
+// 9. Notifications query hook
+export function useNotificationsData() {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: notificationsService.getNotifications,
+    refetchInterval: 5000
   });
 }

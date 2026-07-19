@@ -10,6 +10,7 @@ import auditLogRoutes from "./routes/auditLog";
 import dashboardRoutes from "./routes/dashboard";
 import reportsRoutes from "./routes/reports";
 import settingsRoutes from "./routes/settings";
+import notificationsRoutes from "./routes/notifications";
 
 const app = Fastify({ logger: true });
 
@@ -31,6 +32,7 @@ async function main() {
   await app.register(dashboardRoutes);
   await app.register(reportsRoutes);
   await app.register(settingsRoutes);
+  await app.register(notificationsRoutes);
   await app.listen({ port: config.port, host: "0.0.0.0" });
 }
 

@@ -25,10 +25,11 @@ function deduceAction(recommendedFix: string | null | undefined, vulnCategory: s
 export default async function dashboardRoutes(app: FastifyInstance) {
   app.get("/dashboard", async (req, reply) => {
     try {
-      const [findingsRes, assetsRes, approvalsRes] = await Promise.all([
+      const [findingsRes, assetsRes, approvalsRes, auditLogsRes] = await Promise.all([
         db.from("findings").select("*"),
         db.from("assets").select("*"),
         db.from("approvals").select("*"),
+        db.from("audit_log").select("*").order("created_at", { ascending: false }).limit(20)
       ]);
 
       if (findingsRes.error) return reply.code(500).send({ error: findingsRes.error.message });
@@ -38,6 +39,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       const dbFindings = findingsRes.data || [];
       const dbAssets = assetsRes.data || [];
       const dbApprovals = approvalsRes.data || [];
+      const dbAuditLogs = auditLogsRes.error ? [] : auditLogsRes.data || [];
 
       // Create mapping lookups
       const assetsMap = new Map(dbAssets.map((asset) => [asset.id, asset]));
@@ -83,7 +85,8 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       return {
         incidents,
         endpoints,
-        approvals
+        approvals,
+        auditLogs: dbAuditLogs
       };
     } catch (err: any) {
       return reply.code(500).send({ error: err.message || "Internal Server Error" });

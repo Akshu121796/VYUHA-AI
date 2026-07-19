@@ -289,11 +289,11 @@ export function FindingsPage() {
       </div>
 
       {/* Main Split Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+      <div className="flex flex-col xl:flex-row gap-6 items-start">
         
-        {/* TanStack Table Card (2/3 width) */}
-        <div className="xl:col-span-2 space-y-4">
-          <div className="relative border border-slate-200 rounded-md overflow-hidden bg-white shadow-card h-[460px] overflow-y-auto">
+        {/* TanStack Table Card (62% width) */}
+        <div className="w-full xl:w-[62%] space-y-4 shrink-0">
+          <div className="relative border border-slate-200 rounded-md overflow-hidden bg-white shadow-card h-[460px] overflow-auto">
             
             {/* Skeletons load */}
             {isLoading ? (
@@ -425,47 +425,47 @@ export function FindingsPage() {
           )}
         </div>
 
-        {/* Detailed Inspector Panel (1/3 width) */}
-        <div>
+        {/* Detailed Inspector Panel (38% width) */}
+        <div className="w-full xl:w-[38%] xl:sticky xl:top-6 shrink-0">
           {selectedIncident ? (
-            <Card className="border-slate-200 bg-white shadow-card overflow-hidden relative">
+            <Card className="border-slate-200 bg-white shadow-card overflow-hidden relative flex flex-col max-h-[calc(100vh-210px)] h-[calc(100vh-210px)] min-h-[420px]">
               <div className={cn(
-                "absolute top-0 left-0 right-0 h-[1.5px]",
+                "absolute top-0 left-0 right-0 h-[1.5px] shrink-0",
                 selectedIncident.severity === "critical" && "bg-cyber-critical",
                 selectedIncident.severity === "high" && "bg-cyber-high",
                 selectedIncident.severity === "medium" && "bg-cyber-medium",
                 selectedIncident.severity === "low" && "bg-cyber-low"
               )} />
-              <div className="p-4.5 border-b border-slate-150 flex justify-between items-center bg-slate-50/40">
-                <span className="font-mono text-xs font-bold text-slate-800">{selectedIncident.id}</span>
-                <span className="text-[9px] font-mono text-slate-400">INGESTED: {selectedIncident.detector}</span>
+              <div className="px-5 py-4 border-b border-slate-150 flex justify-between items-center theme-surface-secondary gap-3 min-w-0 shrink-0 relative z-10">
+                <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title={selectedIncident.id}>{selectedIncident.id}</span>
+                <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 shrink-0">INGESTED: {selectedIncident.detector}</span>
               </div>
               
-              <CardContent className="p-4.5 space-y-4">
+              <CardContent className="p-5 space-y-4 flex-1 overflow-y-auto min-h-0">
                 {/* Threat description */}
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800 leading-tight">
+                  <h3 className="text-xs font-bold theme-text leading-tight break-words line-clamp-3 overflow-hidden" title={selectedIncident.title}>
                     {selectedIncident.title}
                   </h3>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge severity={selectedIncident.severity}>{selectedIncident.severity}</Badge>
-                    <span className="font-mono text-[9px] text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-[9px] theme-text-secondary bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
                       {selectedIncident.category}
                     </span>
                   </div>
                 </div>
 
-                <div className="bg-slate-50/60 border border-slate-200 rounded-md p-3.5 font-sans text-xs text-slate-600 leading-relaxed">
+                <div className="bg-slate-50/60 border border-slate-200 rounded-md p-4 font-sans text-xs theme-text-secondary leading-relaxed break-words max-h-48 overflow-y-auto scrollbar-thin">
                   {selectedIncident.description}
                 </div>
 
                 {/* Scope parameters */}
                 <div className="space-y-2 border-t border-slate-100 pt-4">
-                  <h4 className="text-[9px] font-mono font-bold tracking-wider text-slate-400 uppercase">Target Details</h4>
+                  <h4 className="text-[9px] font-mono font-bold tracking-wider theme-text-muted uppercase">Target Details</h4>
                   
                   <div className="grid grid-cols-2 gap-3 font-mono text-[10px]">
                     <div>
-                      <span className="text-slate-400 block">Host Name</span>
+                      <span className="theme-text-muted block">Host Name</span>
                       <span 
                         onClick={() => navigate(`/endpoints/${selectedIncident.hostname}`)}
                         className="text-cyber-primary hover:underline cursor-pointer font-bold flex items-center gap-1 mt-0.5"
@@ -475,78 +475,78 @@ export function FindingsPage() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block">IP Address</span>
-                      <span className="text-slate-800 mt-0.5 block">{selectedIncident.ip}</span>
+                      <span className="theme-text-muted block">IP Address</span>
+                      <span className="theme-text font-bold mt-0.5 block">{selectedIncident.ip}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block">Timestamp</span>
-                      <span className="text-slate-800 mt-0.5 block">
+                      <span className="theme-text-muted block">Timestamp</span>
+                      <span className="theme-text font-bold mt-0.5 block">
                         {new Date(selectedIncident.timestamp).toLocaleDateString()}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block">Mitigation Status</span>
+                      <span className="theme-text-muted block">Mitigation Status</span>
                       <div className="mt-1">
                         <StatusPill status={selectedIncident.status} />
                       </div>
                     </div>
                   </div>
                 </div>
+              </CardContent>
 
-                {/* Operations check playbooks */}
-                <div className="space-y-2.5 border-t border-slate-100 pt-4">
-                  <h4 className="text-[9px] font-mono font-bold tracking-wider text-slate-400 uppercase">Containment Playbooks</h4>
-                  
-                  <div className="flex flex-col gap-2 pt-1">
-                    <Button 
-                      variant="cyber" 
-                      size="sm" 
-                      className="w-full text-xs font-mono justify-center"
-                      onClick={() => navigate(`/copilot?query=review+${selectedIncident.id === "INC-2026-0041" ? "lsass+memory+dump" : "xz-backdoor+vulnerability"}`)}
-                    >
-                      <Sparkles className="mr-2 h-3.5 w-3.5" />
-                      Ask AI Copilot for playbook
-                    </Button>
+              {/* Operations check playbooks (Pinned Footer) */}
+              <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/20 dark:bg-slate-950/20 dark:border-slate-800 shrink-0 space-y-2.5">
+                <h4 className="text-[9px] font-mono font-bold tracking-wider text-slate-400 uppercase">Containment Playbooks</h4>
+                
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    variant="cyber" 
+                    size="sm" 
+                    className="w-full text-xs font-mono justify-center"
+                    onClick={() => navigate(`/copilot?query=review+${selectedIncident.id === "INC-2026-0041" ? "lsass+memory+dump" : "xz-backdoor+vulnerability"}`)}
+                  >
+                    <Sparkles className="mr-2 h-3.5 w-3.5" />
+                    Ask AI Copilot for playbook
+                  </Button>
 
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      {selectedIncident.status === "active" && (
-                        <>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="font-mono text-[9px] border-cyber-low/30 text-cyber-low hover:bg-cyber-low/10"
-                            onClick={() => handleUpdateStatus(selectedIncident.id, "resolved")}
-                          >
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            RESOLVE
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="font-mono text-[9px] bg-cyber-critical/10 text-cyber-critical hover:bg-cyber-critical/20 border border-cyber-critical/20"
-                            onClick={() => navigate(`/approvals?incident=${selectedIncident.id}`)}
-                          >
-                            <ShieldX className="mr-1 h-3 w-3" />
-                            QUARANTINE
-                          </Button>
-                        </>
-                      )}
+                  <div className="grid grid-cols-2 gap-2 mt-0.5">
+                    {selectedIncident.status === "active" && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="font-mono text-[9px] border-cyber-low/30 text-cyber-low hover:bg-cyber-low/10"
+                          onClick={() => handleUpdateStatus(selectedIncident.id, "resolved")}
+                        >
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                          RESOLVE
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="font-mono text-[9px] bg-cyber-critical/10 text-cyber-critical hover:bg-cyber-critical/20 border border-cyber-critical/20"
+                          onClick={() => navigate(`/approvals?incident=${selectedIncident.id}`)}
+                        >
+                          <ShieldX className="mr-1 h-3 w-3" />
+                          QUARANTINE
+                        </Button>
+                      </>
+                    )}
 
-                      {selectedIncident.status === "resolved" && (
-                        <div className="col-span-2 text-center py-2 text-[9px] font-mono text-cyber-low bg-cyber-low/5 border border-cyber-low/20 rounded-md">
-                          Incident closed by administrator. Telemetry marked clean.
-                        </div>
-                      )}
+                    {selectedIncident.status === "resolved" && (
+                      <div className="col-span-2 text-center py-2 text-[9px] font-mono text-cyber-low bg-cyber-low/5 border border-cyber-low/20 rounded-md">
+                        Incident closed by administrator. Telemetry marked clean.
+                      </div>
+                    )}
 
-                      {selectedIncident.status === "suppressed" && (
-                        <div className="col-span-2 text-center py-2 text-[9px] font-mono text-slate-500 bg-slate-50 border border-slate-200 rounded-md">
-                          Incident suppressed at edge sensor logs.
-                        </div>
-                      )}
-                    </div>
+                    {selectedIncident.status === "suppressed" && (
+                      <div className="col-span-2 text-center py-2 text-[9px] font-mono text-slate-500 bg-slate-50 border border-slate-200 rounded-md">
+                        Incident suppressed at edge sensor logs.
+                      </div>
+                    )}
                   </div>
                 </div>
-              </CardContent>
+              </div>
             </Card>
           ) : (
             <div className="border border-dashed border-slate-200 py-24 text-center rounded-md text-xs font-mono text-slate-400">

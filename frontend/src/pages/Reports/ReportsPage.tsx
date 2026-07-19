@@ -29,6 +29,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { useReportsData, useGenerateReportMutation } from "../../hooks/queries/useVyuhaQueries";
+import { apiClient } from "../../services/apiClient";
 import { cn } from "../../utils/cn";
 import { toast } from "sonner";
 
@@ -39,6 +40,7 @@ export function ReportsPage() {
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [downloadingStates, setDownloadingStates] = useState<Record<string, boolean>>({});
 
   if (isLoading || !data) {
     return (
@@ -115,8 +117,52 @@ export function ReportsPage() {
     }, 1200);
   };
 
-  const handleDownload = (id: string, format: "PDF" | "CSV") => {
-    toast.success(`Downloading ${format} file for report ${id}...`);
+  const handleDownload = async (id: string, format: "PDF" | "CSV") => {
+    const toastId = `download-${id}-${format}`;
+    const stateKey = `${id}-${format}`;
+    setDownloadingStates(prev => ({ ...prev, [stateKey]: true }));
+    
+    try {
+      toast.loading(`Initializing ${format} compilation...`, { id: toastId });
+      
+      const response = await apiClient.get(`/reports/${id}/download?format=${format}`, {
+        responseType: "blob",
+        onDownloadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            toast.loading(`Downloading ${format} file: ${percentCompleted}%`, { id: toastId });
+          } else {
+            toast.loading(`Downloading ${format} file...`, { id: toastId });
+          }
+        }
+      });
+      
+      const blob = new Blob([response.data], {
+        type: format === "PDF" ? "application/pdf" : "text/csv"
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      
+      const report = reports.find((r: any) => r.id === id);
+      const filename = report 
+        ? `${report.title.replace(/\s+/g, "_")}_${id}.${format.toLowerCase()}`
+        : `Report_${id}.${format.toLowerCase()}`;
+        
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(`${format} report downloaded successfully.`, { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error(`Failed to download report. Check system logs.`, { id: toastId });
+    } finally {
+      setDownloadingStates(prev => ({ ...prev, [stateKey]: false }));
+    }
   };
 
   return (
@@ -220,12 +266,12 @@ export function ReportsPage() {
                     <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
                 <ChartTooltip 
-                  contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e5e7eb", borderRadius: "6px", fontSize: "10px", fontFamily: "monospace" }} 
-                  itemStyle={{ color: "#0f172a" }}
+                  contentStyle={{ backgroundColor: "var(--chart-tooltip-bg)", borderColor: "var(--border)", borderRadius: "6px", fontSize: "10px", fontFamily: "monospace" }} 
+                  itemStyle={{ color: "var(--text-primary)" }}
                 />
                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: "10px", fontFamily: "monospace", paddingBottom: "10px" }} />
                 <Area type="monotone" dataKey="Critical" stroke="#ef4444" strokeWidth={1.5} fill="url(#c1)" />
@@ -245,12 +291,12 @@ export function ReportsPage() {
           <CardContent className="h-[220px] pt-4 p-4.5">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={riskTrendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
                 <ChartTooltip 
-                  contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e5e7eb", borderRadius: "6px", fontSize: "10px", fontFamily: "monospace" }} 
-                  itemStyle={{ color: "#0f172a" }}
+                  contentStyle={{ backgroundColor: "var(--chart-tooltip-bg)", borderColor: "var(--border)", borderRadius: "6px", fontSize: "10px", fontFamily: "monospace" }} 
+                  itemStyle={{ color: "var(--text-primary)" }}
                 />
                 <Line type="monotone" dataKey="score" stroke="#2563eb" strokeWidth={2} activeDot={{ r: 4 }} />
               </LineChart>
@@ -272,12 +318,12 @@ export function ReportsPage() {
             <CardContent className="h-[220px] pt-4 p-4.5">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={resolvedData} barGap={4} barSize={12}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
                   <ChartTooltip 
-                    contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e5e7eb", borderRadius: "6px", fontSize: "10px", fontFamily: "monospace" }} 
-                    itemStyle={{ color: "#0f172a" }}
+                    contentStyle={{ backgroundColor: "var(--chart-tooltip-bg)", borderColor: "var(--border)", borderRadius: "6px", fontSize: "10px", fontFamily: "monospace" }} 
+                    itemStyle={{ color: "var(--text-primary)" }}
                   />
                   <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: "10px", fontFamily: "monospace" }} />
                   <Bar dataKey="Resolved" fill="#22c55e" radius={[3, 3, 0, 0]} />
@@ -303,7 +349,7 @@ export function ReportsPage() {
                       <th className="p-3.5 pl-4 font-semibold">Report ID</th>
                       <th className="p-3.5 font-semibold">Document Title</th>
                       <th className="p-3.5 font-semibold">File Specs</th>
-                      <th className="p-3.5 font-semibold">Downloads</th>
+                      <th className="p-3.5 font-semibold hidden sm:table-cell">Downloads</th>
                       <th className="p-3.5 text-right pr-4 font-semibold">Actions</th>
                     </tr>
                   </thead>
@@ -318,31 +364,35 @@ export function ReportsPage() {
                     {reports.map((rep: { id: string; title: string; format: string; size: string; downloadCount: number }) => (
                       <tr key={rep.id} className="hover:bg-slate-50/50 transition-premium">
                         <td className="p-3.5 pl-4 font-bold text-slate-800">{rep.id}</td>
-                        <td className="p-3.5 font-sans font-semibold text-slate-800">{rep.title}</td>
+                        <td className="p-3.5 font-sans font-semibold text-slate-800 max-w-[200px] sm:max-w-[300px] truncate" title={rep.title}>
+                          {rep.title}
+                        </td>
                         <td className="p-3.5">
                           <span className="text-[10px] bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-semibold shadow-sm">
                             {rep.format} • {rep.size}
                           </span>
                         </td>
-                        <td className="p-3.5 pl-6">{rep.downloadCount}</td>
+                        <td className="p-3.5 pl-6 hidden sm:table-cell">{rep.downloadCount}</td>
                         <td className="p-3.5 text-right pr-4 flex justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
                             className="h-6.5 text-[9px] font-mono px-2"
+                            disabled={downloadingStates[`${rep.id}-PDF`]}
                             onClick={() => handleDownload(rep.id, "PDF")}
                           >
                             <Download className="mr-1 h-3 w-3" />
-                            PDF
+                            {downloadingStates[`${rep.id}-PDF`] ? "PDF..." : "PDF"}
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-6.5 text-[9px] font-mono px-2"
+                            disabled={downloadingStates[`${rep.id}-CSV`]}
                             onClick={() => handleDownload(rep.id, "CSV")}
                           >
                             <FileSpreadsheet className="mr-1 h-3 w-3 text-slate-400" />
-                            CSV
+                            {downloadingStates[`${rep.id}-CSV`] ? "CSV..." : "CSV"}
                           </Button>
                         </td>
                       </tr>

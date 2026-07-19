@@ -17,7 +17,7 @@ import {
   Network,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { mockIncidents, mockApprovalTasks } from "../services/mockData";
+import { useIncidentsData, useApprovalsData } from "../hooks/queries/useVyuhaQueries";
 import { cn } from "../utils/cn";
 
 interface SidebarProps {
@@ -30,8 +30,11 @@ export function Sidebar({ isCollapsed, onToggleCollapse, onNavigate }: SidebarPr
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const activeFindingsCount = mockIncidents.filter((i) => i.status === "active").length;
-  const pendingApprovalsCount = mockApprovalTasks.filter((t) => t.status === "pending").length;
+  const { data: incidents } = useIncidentsData();
+  const { data: approvals } = useApprovalsData();
+
+  const activeFindingsCount = (incidents || []).filter((i: any) => i.status === "active" || i.status === "open").length;
+  const pendingApprovalsCount = (approvals || []).filter((t: any) => t.status === "pending").length;
 
   const menuItems = [
     { path: "/", name: "Dashboard", icon: <Landmark className="h-4 w-4" /> },

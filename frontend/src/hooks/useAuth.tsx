@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { apiClient } from "../services/apiClient";
 
 interface User {
   username: string;
@@ -13,6 +14,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
+  updateUser: (updatedUser: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,7 +27,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const stored = localStorage.getItem("vyuha_auth_user");
     if (stored) {
       try {
-        setUser(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setUser(parsed);
+        
+        // Sync profile dynamically from Supabase via backend
+        apiClient.get("/settings")
+          .then((res) => {
+            if (res.data && res.data.profile) {
+              const updated = {
+                ...parsed,
+                username: res.data.profile.name || parsed.username,
+                role: res.data.profile.title || parsed.role,
+              };
+              localStorage.setItem("vyuha_auth_user", JSON.stringify(updated));
+              setUser(updated);
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to sync profile settings from backend:", err);
+          });
       } catch (e) {
         localStorage.removeItem("vyuha_auth_user");
       }
@@ -48,6 +68,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem("vyuha_auth_user", JSON.stringify(defaultUser));
     setUser(defaultUser);
     setIsLoading(false);
+    
+    // Attempt background sync immediately after login to overwrite default if profile already exists in DB
+    apiClient.get("/settings")
+      .then((res) => {
+        if (res.data && res.data.profile) {
+          const updated = {
+            ...defaultUser,
+            username: res.data.profile.name || defaultUser.username,
+            role: res.data.profile.title || defaultUser.role,
+          };
+          localStorage.setItem("vyuha_auth_user", JSON.stringify(updated));
+          setUser(updated);
+        }
+      })
+      .catch(() => {});
+
     return true;
   };
 
@@ -56,8 +92,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const updateUser = (updatedFields: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const next = { ...prev, ...updatedFields };
+      localStorage.setItem("vyuha_auth_user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -70,4 +115,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
 export default useAuth;

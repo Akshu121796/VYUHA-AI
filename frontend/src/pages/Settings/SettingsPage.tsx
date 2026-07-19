@@ -36,7 +36,7 @@ interface ApiKeyItem {
 
 export function SettingsPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { data: settings, isLoading } = useSettingsData();
   const updateSettings = useUpdateSettingsMutation();
   
@@ -108,6 +108,12 @@ export function SettingsPage() {
     }, {
       onSuccess: () => {
         toast.success(`Settings for "${section}" updated successfully.`);
+        if (section === "Profile") {
+          updateUser({
+            username: profileName,
+            role: profileTitle
+          });
+        }
       }
     });
   };

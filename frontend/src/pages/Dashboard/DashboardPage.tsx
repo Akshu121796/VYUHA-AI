@@ -41,6 +41,98 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { data, isLoading } = useDashboardData();
 
+  // Dynamically compile timeline events from audit logs, approvals, and findings
+  const timelineEvents = React.useMemo(() => {
+    if (!data) return [];
+    const events: any[] = [];
+
+    // 1. Process audit logs
+    const auditLogs = data.auditLogs || [];
+    auditLogs.forEach((log: any) => {
+      let title = "Security Action";
+      let desc = log.action;
+      let type: "critical" | "high" | "medium" | "low" | "neutral" = "neutral";
+
+      if (log.action === "asset_isolated") {
+        title = "Host isolated";
+        desc = `Host ${log.details?.hostname || "unknown"} isolated from production segment.`;
+        type = "critical";
+      } else if (log.action === "asset_reconnected") {
+        title = "Host reconnected";
+        desc = `Host ${log.details?.hostname || "unknown"} reconnected to production segment.`;
+        type = "low";
+      } else if (log.action === "process_terminated") {
+        title = "Process terminated";
+        desc = `Process (PID ${log.details?.pid}) terminated on host ${log.details?.hostname || "unknown"}.`;
+        type = "high";
+      } else if (log.action === "approval_requested") {
+        title = "Playbook executed";
+        desc = `Containment playbook approval requested for finding ID ${log.details?.finding_id || ""}.`;
+        type = "medium";
+      } else if (log.action === "approval_approved") {
+        title = "Approval granted";
+        desc = `Administrative approval granted for request ID ${log.details?.approval_id || ""}.`;
+        type = "low";
+      } else if (log.action === "approval_rejected") {
+        title = "Approval rejected";
+        desc = `Administrative approval rejected for request ID ${log.details?.approval_id || ""}.`;
+        type = "neutral";
+      } else if (log.action === "remediation_applied") {
+        title = "Playbook executed";
+        desc = `Playbook mitigation applied for finding ID ${log.details?.finding_id || ""}.`;
+        type = "low";
+      } else if (log.action === "remediation_verified") {
+        title = "Remediation verified";
+        desc = `Remediation verified for finding ID ${log.details?.finding_id || ""}.`;
+        type = "low";
+      } else if (log.action === "report_generated") {
+        title = "Report generated";
+        desc = `Report "${log.details?.title || ""}" compiled and generated.`;
+        type = "neutral";
+      }
+
+      events.push({
+        id: `audit-${log.id}`,
+        title,
+        description: desc,
+        timestamp: new Date(log.created_at || log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + " UTC",
+        rawTime: new Date(log.created_at || log.timestamp).getTime(),
+        type
+      });
+    });
+
+    // 2. Process approvals
+    const approvalsList = data.approvals || [];
+    approvalsList.forEach((appr: any) => {
+      if (appr.status === "pending") {
+        events.push({
+          id: `appr-${appr.id}`,
+          title: "Approval pending",
+          description: `Isolation approval required for target ${appr.target}. Reason: ${appr.reason}`,
+          timestamp: new Date(appr.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + " UTC",
+          rawTime: new Date(appr.timestamp).getTime(),
+          type: "medium"
+        });
+      }
+    });
+
+    // 3. Process findings (Threat detected)
+    const incidentsList = data.incidents || [];
+    incidentsList.forEach((inc: any) => {
+      events.push({
+        id: `inc-${inc.id}`,
+        title: "Threat detected",
+        description: `${inc.title} detected on asset ${inc.hostname}.`,
+        timestamp: new Date(inc.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + " UTC",
+        rawTime: new Date(inc.timestamp).getTime(),
+        type: inc.severity === "critical" ? "critical" : inc.severity === "high" ? "high" : inc.severity === "medium" ? "medium" : "low"
+      });
+    });
+
+    // Sort newest first
+    return events.sort((a, b) => b.rawTime - a.rawTime);
+  }, [data]);
+
   if (isLoading || !data) {
     return (
       <div className="space-y-6">
@@ -61,6 +153,36 @@ export function DashboardPage() {
   }
 
   const { incidents, endpoints, approvals } = data;
+
+  const getTimelineStyles = (type: string) => {
+    switch (type) {
+      case "critical":
+        return {
+          bullet: "bg-cyber-critical pulse-red",
+          box: "border-red-100 bg-red-50/35 dark:border-red-950/20 dark:bg-red-950/5 shadow-[0_8px_18px_-16px_rgba(239,68,68,0.35)]"
+        };
+      case "high":
+        return {
+          bullet: "bg-cyber-high pulse-orange",
+          box: "border-amber-100 bg-amber-50/35 dark:border-amber-950/20 dark:bg-amber-950/5 shadow-[0_8px_18px_-16px_rgba(245,158,11,0.28)]"
+        };
+      case "medium":
+        return {
+          bullet: "bg-cyber-medium pulse-yellow",
+          box: "border-yellow-100 bg-yellow-50/35 dark:border-yellow-950/20 dark:bg-yellow-950/5 shadow-[0_8px_18px_-16px_rgba(234,179,8,0.28)]"
+        };
+      case "low":
+        return {
+          bullet: "bg-cyber-low pulse-green",
+          box: "border-emerald-100 bg-emerald-50/35 dark:border-emerald-950/20 dark:bg-emerald-950/5 shadow-[0_8px_18px_-16px_rgba(34,197,94,0.28)]"
+        };
+      default:
+        return {
+          bullet: "bg-cyber-neutral",
+          box: "border-slate-200 bg-slate-50/35 dark:border-slate-800/20 dark:bg-slate-900/5 shadow-sm"
+        };
+    }
+  };
 
   // Telemetry counts
   const activeIncidents = incidents.filter((i: any) => i.status === "active" || i.status === "investigating");
@@ -160,19 +282,19 @@ export function DashboardPage() {
         
         {/* Card 1: Critical Findings */}
         <motion.div whileHover={{ y: -2 }} className="transition-premium">
-          <Card hoverable className="relative overflow-hidden border-t-2 border-t-red-400 bg-gradient-to-br from-red-50/35 via-white to-white">
-            <CardContent className="p-4.5">
+          <Card hoverable className="relative overflow-hidden border-t-2 border-t-red-400 bg-gradient-to-br from-red-50/35 via-white to-white dark:from-red-950/20 dark:via-slate-900/40 dark:to-slate-950/40">
+            <div className="relative z-[1] pt-10 px-5 pb-5 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-500">Critical findings</span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600">
+                <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider theme-text-secondary">Critical findings</span>
+                <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 shrink-0">
                   <ShieldAlert className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mt-4 flex items-end justify-between">
-                <span className="text-3xl font-semibold tracking-tight theme-text">{criticalCount}</span>
-                <span className="rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600">+12% today</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-3xl font-bold tracking-tight theme-text">{criticalCount}</span>
+                <span className="rounded-full border border-red-100 bg-red-50 px-2.5 py-0.5 text-[9px] font-mono font-semibold text-red-650">+12% today</span>
               </div>
-              <div className="mt-3 h-7">
+              <div className="h-7">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={criticalTrend}>
                     <defs>
@@ -185,25 +307,25 @@ export function DashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </motion.div>
 
         {/* Card 2: High Risk Endpoints */}
         <motion.div whileHover={{ y: -2 }} className="transition-premium">
-          <Card hoverable className="relative overflow-hidden border-t-2 border-t-amber-400 bg-gradient-to-br from-amber-50/35 via-white to-white">
-            <CardContent className="p-4.5">
+          <Card hoverable className="relative overflow-hidden border-t-2 border-t-amber-400 bg-gradient-to-br from-amber-50/35 via-white to-white dark:from-amber-950/20 dark:via-slate-900/40 dark:to-slate-950/40">
+            <div className="relative z-[1] pt-10 px-5 pb-5 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-500">High risk hosts</span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50 text-amber-600">
+                <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider theme-text-secondary">High risk hosts</span>
+                <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-amber-600 shrink-0">
                   <Monitor className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mt-4 flex items-end justify-between">
-                <span className="text-3xl font-semibold tracking-tight theme-text">{highRiskHosts}</span>
-                <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">+8% today</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-3xl font-bold tracking-tight theme-text">{highRiskHosts}</span>
+                <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-[9px] font-mono font-semibold text-amber-650">+8% today</span>
               </div>
-              <div className="mt-3 h-7">
+              <div className="h-7">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={riskTrend}>
                     <defs>
@@ -216,25 +338,25 @@ export function DashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </motion.div>
 
         {/* Card 3: Open Incidents */}
         <motion.div whileHover={{ y: -2 }} className="transition-premium">
-          <Card hoverable className="relative overflow-hidden border-t-2 border-t-blue-400 bg-gradient-to-br from-blue-50/45 via-white to-white">
-            <CardContent className="p-4.5">
+          <Card hoverable className="relative overflow-hidden border-t-2 border-t-blue-400 bg-gradient-to-br from-blue-50/45 via-white to-white dark:from-blue-950/20 dark:via-slate-900/40 dark:to-slate-950/40">
+            <div className="relative z-[1] pt-10 px-5 pb-5 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-500">Open incidents</span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+                <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider theme-text-secondary">Open incidents</span>
+                <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600 shrink-0">
                   <Activity className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mt-4 flex items-end justify-between">
-                <span className="text-3xl font-semibold tracking-tight theme-text">{activeIncidents.length}</span>
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">3 new today</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-3xl font-bold tracking-tight theme-text">{activeIncidents.length}</span>
+                <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[9px] font-mono font-semibold text-blue-700">3 new today</span>
               </div>
-              <div className="mt-3 h-7">
+              <div className="h-7">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={incidentTrend}>
                     <defs>
@@ -247,25 +369,25 @@ export function DashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </motion.div>
 
         {/* Card 4: Pending Approvals */}
         <motion.div whileHover={{ y: -2 }} className="transition-premium">
-          <Card hoverable className="relative overflow-hidden border-t-2 border-t-violet-400 bg-gradient-to-br from-violet-50/45 via-white to-white">
-            <CardContent className="p-4.5">
+          <Card hoverable className="relative overflow-hidden border-t-2 border-t-violet-400 bg-gradient-to-br from-violet-50/45 via-white to-white dark:from-violet-950/20 dark:via-slate-900/40 dark:to-slate-950/40">
+            <div className="relative z-[1] pt-10 px-5 pb-5 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-500">Pending approvals</span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-violet-100 bg-violet-50 text-violet-600">
+                <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider theme-text-secondary">Pending approvals</span>
+                <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-violet-100 bg-violet-50 text-violet-600 shrink-0">
                   <CheckSquare className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mt-4 flex items-end justify-between">
-                <span className="text-3xl font-semibold tracking-tight theme-text">{pendingApprovals}</span>
-                <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600">Awaiting review</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-3xl font-bold tracking-tight theme-text">{pendingApprovals}</span>
+                <span className="rounded-full border border-violet-100 bg-violet-50 px-2.5 py-0.5 text-[9px] font-mono font-semibold text-violet-700">Awaiting review</span>
               </div>
-              <div className="mt-3 h-7">
+              <div className="h-7">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={approvalTrend}>
                     <defs>
@@ -278,7 +400,7 @@ export function DashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </motion.div>
       </motion.div>
@@ -392,8 +514,8 @@ export function DashboardPage() {
                     <th className="p-3 pl-4">Incident ID</th>
                     <th className="p-3">Threat Description</th>
                     <th className="p-3">Target Asset</th>
-                    <th className="p-3">Security Category</th>
-                    <th className="p-3">Incident State</th>
+                    <th className="p-3 hidden sm:table-cell">Security Category</th>
+                    <th className="p-3 hidden md:table-cell">Incident State</th>
                     <th className="p-3 text-right pr-4">Action</th>
                   </tr>
                 </thead>
@@ -405,8 +527,8 @@ export function DashboardPage() {
                         {inc.title}
                       </td>
                       <td className="p-3 text-cyber-primary font-bold">{inc.hostname}</td>
-                      <td className="p-3 text-slate-500">{inc.category}</td>
-                      <td className="p-3">
+                      <td className="p-3 text-slate-500 hidden sm:table-cell">{inc.category}</td>
+                      <td className="p-3 hidden md:table-cell">
                         <StatusPill status={inc.status} />
                       </td>
                       <td className="p-3 text-right pr-4">
@@ -438,43 +560,26 @@ export function DashboardPage() {
             <CardDescription>Chronological sequence of security actions and network blocks (Last 12 Hours)</CardDescription>
           </CardHeader>
           <CardContent className="p-4.5 pt-0">
-            <div className="relative ml-2.5 space-y-3 border-l border-slate-200 pl-6 pt-3">
-              
-              {/* Event 1 */}
-              <div className="relative rounded-xl border border-red-100 bg-red-50/35 p-3 shadow-[0_8px_18px_-16px_rgba(239,68,68,0.35)] transition-premium hover:-translate-y-0.5">
-                <span className="absolute -left-[30px] top-1 h-3 w-3 rounded-full bg-cyber-critical border-2 border-white pulse-red" />
-                <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-semibold text-slate-800">Automatic quarantine playbook isolation invoked</span>
-                  <span className="w-fit rounded-full theme-surface px-2 py-0.5 text-[10px] font-medium theme-text-secondary shadow-sm">03:42 UTC</span>
-                </div>
-                <p className="text-[10.5px] text-slate-500 mt-0.5">
-                  Host <span className="font-semibold text-slate-700">web-prod-ubuntu-01</span> isolated from production segment after LSASS dump detection.
-                </p>
-              </div>
-
-              {/* Event 2 */}
-              <div className="relative rounded-xl border border-amber-100 bg-amber-50/35 p-3 shadow-[0_8px_18px_-16px_rgba(245,158,11,0.28)] transition-premium hover:-translate-y-0.5">
-                <span className="absolute -left-[30px] top-1 h-3 w-3 rounded-full bg-cyber-high border-2 border-white pulse-orange" />
-                <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-semibold text-slate-800">Critical vulnerability scan triggered</span>
-                  <span className="w-fit rounded-full theme-surface px-2 py-0.5 text-[10px] font-medium theme-text-secondary shadow-sm">03:38 UTC</span>
-                </div>
-                <p className="text-[10.5px] text-slate-500 mt-0.5">
-                  Full baseline scanning triggered automatically across DC segments. CVE-2024-3094 indicators checked.
-                </p>
-              </div>
-
-              {/* Event 3 */}
-              <div className="relative rounded-xl border border-emerald-100 bg-emerald-50/35 p-3 shadow-[0_8px_18px_-16px_rgba(34,197,94,0.28)] transition-premium hover:-translate-y-0.5">
-                <span className="absolute -left-[30px] top-1 h-3 w-3 rounded-full bg-cyber-low border-2 border-white pulse-green" />
-                <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-semibold text-slate-800">Active Directory policy sync completed</span>
-                  <span className="w-fit rounded-full theme-surface px-2 py-0.5 text-[10px] font-medium theme-text-secondary shadow-sm">02:15 UTC</span>
-                </div>
-                <p className="text-[10.5px] text-slate-500 mt-0.5">
-                  Operator <span className="font-semibold text-slate-700">Kaveesh</span> deployed updated RDP credential security filters on root DC.
-                </p>
-              </div>
+            <div className="relative ml-2.5 space-y-3 border-l border-slate-200 dark:border-slate-800 pl-6 pt-3">
+              {timelineEvents.length === 0 ? (
+                <div className="text-xs text-slate-400 dark:text-slate-500 font-mono py-4">No recent security actions or detections logged.</div>
+              ) : (
+                timelineEvents.slice(0, 8).map((evt) => {
+                  const styles = getTimelineStyles(evt.type);
+                  return (
+                    <div key={evt.id} className={cn("relative rounded-xl border p-3 transition-premium hover:-translate-y-0.5", styles.box)}>
+                      <span className={cn("absolute -left-[31px] top-4.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-slate-900", styles.bullet)} />
+                      <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{evt.title}</span>
+                        <span className="w-fit rounded-full theme-surface px-2 py-0.5 text-[10px] font-medium theme-text-secondary shadow-sm">{evt.timestamp}</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {evt.description}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>
