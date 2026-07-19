@@ -43,8 +43,8 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 ```
 
 
-## Tech Stack
-# Frontend
+# Tech Stack
+## Frontend
 
 - React 18
 - TypeScript
@@ -55,14 +55,14 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 - Recharts
 - Framer Motion
 
-# Backend
+## Backend
 
 - Node.js
 - Fastify
 - Supabase (PostgreSQL)
 - JWT Authentication
 
-# AI & Threat Intelligence
+## AI & Threat Intelligence
 
 - Groq (Llama 3.3)
 - ChromaDB
@@ -74,7 +74,7 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 - Nmap
 
 
-# 📂 Project Structure
+## 📂 Project Structure
 ```text
 VYUHA-AI/
 │
@@ -115,8 +115,8 @@ VYUHA-AI/
 └── .env.example
 ```
 
-## Installation
-# Clone Repository
+# Installation
+## Clone Repository
 
 ```bash
 git clone https://github.com/Akshu121796/VYUHA-AI.git
@@ -124,7 +124,7 @@ cd VYUHA-AI
 ```
 
 ---
-# Install Dependencies
+## Install Dependencies
 
 ```bash
 npm install
@@ -132,7 +132,7 @@ npm install
 
 ---
 
-# Configure Environment
+## Configure Environment
 
 Create a `.env` file.
 ```env
@@ -143,7 +143,7 @@ GROQ_API_KEY=
 NVD_API_KEY=
 ```
 
-# Run the Project
+## Run the Project
 ```bash
 npm run dev
 ```
@@ -151,10 +151,7 @@ This starts:
 - ✅ Frontend
 - ✅ Backend
 
----
-
 #  Application Modules
-
 - Dashboard
 - Findings
 - Endpoints
@@ -164,7 +161,7 @@ This starts:
 - Reports
 - Settings
 
-## Demo Workflow
+# Demo Workflow
 
 1. Import Nmap/OpenVAS Scan
 2. Parse and Normalize Findings
@@ -176,7 +173,7 @@ This starts:
 8. Export Executive Reports
 
 
-## Security Highlights
+# Security Highlights
 - Human-in-the-loop remediation
 - Role-Based Access Control (RBAC)
 - JWT Authentication
