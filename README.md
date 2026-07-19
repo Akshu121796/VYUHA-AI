@@ -1,12 +1,6 @@
 # 🛡️ VYUHA.AI
 > **AI-Powered Endpoint Detection & Response (EDR) Platform with Attack Path Intelligence and AI-Assisted Remediation**
 
-<p align="center">
-  <img src="docs/dashboard.png" alt="VYUHA Dashboard" width="900"/>
-</p>
-
----
-
 # 📌 Overview
 VYUHA.AI is an AI-powered Endpoint Detection & Response (EDR) platform that transforms raw vulnerability scan data into actionable security intelligence.
 
