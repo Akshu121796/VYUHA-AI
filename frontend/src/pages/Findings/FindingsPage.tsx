@@ -27,8 +27,7 @@ import {
   ChevronRight,
   RefreshCw
 } from "lucide-react";
-import { useIncidentsData, useUpdateIncidentMutation } from "../../hooks/queries/useVyuhaQueries";
-import { useQueryClient } from "@tanstack/react-query";
+import { useIncidentsData, useUpdateIncidentMutation, useResetTelemetryMutation } from "../../hooks/queries/useVyuhaQueries";
 import { Incident, Severity, IncidentStatus } from "../../types";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
@@ -43,9 +42,9 @@ import { toast } from "sonner";
 export function FindingsPage() {
   const navigate = useNavigate();
 
-  const queryClient = useQueryClient();
   const { data: incidentsData, isLoading } = useIncidentsData();
   const updateIncident = useUpdateIncidentMutation();
+  const resetTelemetry = useResetTelemetryMutation();
 
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
 
@@ -209,13 +208,20 @@ export function FindingsPage() {
             variant="outline" 
             size="sm" 
             className="font-mono text-[10px]" 
+            disabled={resetTelemetry.isPending}
             onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ["incidents"] });
-              toast.success("Telemetry log refreshed.");
+              resetTelemetry.mutate(undefined, {
+                onSuccess: () => {
+                  toast.success("Telemetry logs reset to initial active state.");
+                },
+                onError: (err: any) => {
+                  toast.error("Failed to reset telemetry: " + (err.message || "Unknown error"));
+                }
+              });
             }}
           >
-            <RefreshCw className="mr-1.5 h-3 w-3 text-brand-secondary" />
-            RESET TELEMETRY
+            <RefreshCw className={cn("mr-1.5 h-3 w-3 text-brand-secondary", resetTelemetry.isPending && "animate-spin")} />
+            {resetTelemetry.isPending ? "RESETTING..." : "RESET TELEMETRY"}
           </Button>
         </div>
       </div>

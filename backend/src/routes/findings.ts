@@ -145,4 +145,29 @@ export default async function findingsRoutes(app: FastifyInstance) {
       return { reclassified: results.length, results };
     }
   );
+
+  app.post(
+    "/findings/reset",
+    { preHandler: requireRole("admin") },
+    async (req, reply) => {
+      const [findingsRes, approvalsRes, auditRes] = await Promise.all([
+        db.from("findings").update({ status: "open" }).neq("status", "open"),
+        db.from("approvals").update({ status: "pending" }).neq("status", "pending"),
+        db.from("audit_log").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+      ]);
+
+      if (findingsRes.error || approvalsRes.error || auditRes.error) {
+        return reply.code(500).send({
+          error: "Failed to reset telemetry",
+          details: {
+            findingsError: findingsRes.error?.message,
+            approvalsError: approvalsRes.error?.message,
+            auditError: auditRes.error?.message
+          }
+        });
+      }
+
+      return { status: "success", message: "Telemetry database reset completed successfully." };
+    }
+  );
 }

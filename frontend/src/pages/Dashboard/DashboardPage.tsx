@@ -19,15 +19,12 @@ import {
   ShieldAlert, 
   Monitor, 
   CheckSquare, 
-  Activity, 
-  ArrowUpRight, 
-  ShieldCheck, 
-  Clock, 
-  Sparkles,
+  Activity,
+  ArrowUpRight,
   ChevronRight,
-  Server,
   ArrowRight,
-  HelpCircle
+  Clock,
+  Sparkles
 } from "lucide-react";
 import { useDashboardData } from "../../hooks/queries/useVyuhaQueries";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/Card";

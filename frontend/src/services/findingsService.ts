@@ -9,6 +9,10 @@ export const findingsService = {
   updateIncidentStatus: async (id: string, status: IncidentStatus) => {
     const res = await apiClient.put(`/findings/${id}`, { status });
     return res.data;
+  },
+  resetTelemetry: async () => {
+    const res = await apiClient.post("/findings/reset");
+    return res.data;
   }
 };
 export default findingsService;

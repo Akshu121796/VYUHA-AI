@@ -252,27 +252,3 @@ export const liveLogStream = [
   { timestamp: "03:37:05", message: "Successful administrative RDP login to ad-dc-windows-01 from workstation-12", type: "info" },
 ];
 
-export const mockCopilotAnswers: { [query: string]: { text: string; code?: string; language?: string; actions?: any[] } } = {
-  "analyze xz-backdoor vulnerability": {
-    text: "The web-prod-ubuntu-01 server is currently running xz-utils library (CVE-2024-3094), which contains a malicious backdoor allowing unauthorized SSH remote execution. The system load is currently high (88% CPU) and there are active suspicious Python and SSHD processes. I highly recommend immediate network isolation of the host and rolling back the xz library version.",
-    actions: [
-      { label: "Isolate Web Server", action: "isolate_host", payload: "web-prod-ubuntu-01" },
-      { label: "Review Active Approvals", action: "navigate", payload: "/approvals" }
-    ]
-  },
-  "review lsass memory dump": {
-    text: "On ad-dc-windows-01 (Domain Controller), a memory dump of lsass.exe was triggered at 03:30:15Z. The lsass process is critical for Windows local authentication. Creating memory dumps is a classic technique used to retrieve plaintext passwords or NTLM hashes. You should immediately isolate the Domain Controller (if backup channels are ready) or terminate the rogue administrative shell.",
-    code: "taskkill /F /PID 652\n# Terminate suspicious lsass parent handle shell context",
-    language: "powershell",
-    actions: [
-      { label: "Terminate Suspicious Process", action: "terminate_process", payload: "PID 652 (lsass.exe dump) on ad-dc-windows-01" }
-    ]
-  },
-  "default": {
-    text: "I am VYUHA.AI's Cyber Security Copilot. I scan security telemetry, analyze endpoint vulnerabilities, and run incident playbooks. Ask me about CVEs, credential access on ad-dc-windows-01, SSH logins on web-prod-ubuntu-01, or pending isolation requests.",
-    actions: [
-      { label: "Analyze web-prod-ubuntu-01", action: "ask", payload: "analyze xz-backdoor vulnerability" },
-      { label: "Investigate ad-dc-windows-01", action: "ask", payload: "review lsass memory dump" }
-    ]
-  }
-};

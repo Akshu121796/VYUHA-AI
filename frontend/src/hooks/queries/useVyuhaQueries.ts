@@ -38,6 +38,18 @@ export function useUpdateIncidentMutation() {
   });
 }
 
+export function useResetTelemetryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: findingsService.resetTelemetry,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["approvals"] });
+    }
+  });
+}
+
 // 3. Endpoints queries hooks
 export function useEndpointsData() {
   return useQuery({

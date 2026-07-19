@@ -1,19 +1,31 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Navigate, Outlet, useSearchParams } from "react-router-dom";
-import { Sparkles, Terminal, Send, ArrowRight, MessageSquareCode, Trash2, Cpu } from "lucide-react";
+import { Navigate, Outlet, useSearchParams, useNavigate } from "react-router-dom";
+import { Sparkles, Terminal, Send, ArrowRight, Trash2, Server } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { CommandMenu } from "../components/CommandMenu";
-import { mockCopilotAnswers } from "../services/mockData";
-import { copilotService } from "../services/copilotService";
+import { useCopilotMutation, useEndpointsData } from "../hooks/queries/useVyuhaQueries";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { cn } from "../utils/cn";
 
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  isStreaming?: boolean;
+  codeBlock?: { language: string; code: string };
+  referenceCard?: { hostname: string; ip: string; cve?: string; severity: "critical" | "high" | "medium" | "low" };
+  actions?: Array<{ label: string; action: string; payload: string }>;
+}
+
 export function ProtectedLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const { data: assets } = useEndpointsData();
+  const copilotMutation = useCopilotMutation();
   
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
@@ -68,7 +80,7 @@ export function ProtectedLayout() {
   }, [isSidebarCollapsed]);
 
   // AI Copilot state
-  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string; code?: string; language?: string; actions?: any[] }>>([
+  const [chatMessages, setChatMessages] = useState<Message[]>([
     {
       role: "assistant",
       content: "Hello! I am VYUHA.AI's Cyber Security Copilot. I scan security telemetry, analyze endpoint vulnerabilities, and run incident playbooks. Ask me about CVEs, credential access on ad-dc-windows-01, SSH logins on web-prod-ubuntu-01, or pending isolation requests.",
@@ -116,48 +128,99 @@ export function ProtectedLayout() {
   }, [chatMessages, isCopilotTyping]);
 
   const handleSendCopilotMessage = (contentText: string) => {
-    if (!contentText.trim()) return;
+    if (!contentText.trim() || isCopilotTyping) return;
 
-    const userMsg = { role: "user" as const, content: contentText };
+    const userMsg: Message = { role: "user" as const, content: contentText };
     setChatMessages(prev => [...prev, userMsg]);
     setCopilotInput("");
     setIsCopilotTyping(true);
 
-    copilotService.sendPrompt(contentText)
-      .then((data) => {
+    copilotMutation.mutate(contentText, {
+      onSuccess: (data: any) => {
         setIsCopilotTyping(false);
-        const answer = data.answer || "";
-        
-        // Parse markdown code blocks in answer if present
+        const { answer } = data;
+
+        // Parse code blocks from Markdown content
         const match = answer.match(/```(\w+)?\n([\s\S]+?)\n```/);
-        let codeBlock: string | undefined;
-        let codeLang: string | undefined;
+        let codeBlock: { language: string; code: string } | undefined;
         let cleanContent = answer;
         if (match) {
-          codeLang = match[1] || "bash";
-          codeBlock = match[2].trim();
+          codeBlock = {
+            language: match[1] || "bash",
+            code: match[2].trim()
+          };
           cleanContent = answer.replace(/```(\w+)?\n([\s\S]+?)\n```/g, "").trim();
         }
 
-        setChatMessages(prev => [
-          ...prev, 
-          { 
-            role: "assistant" as const, 
-            content: cleanContent, 
-            code: codeBlock, 
-            language: codeLang,
-            actions: [] 
+        // Dynamically find host references in the response text
+        const matchedAsset = assets?.find((a: any) => 
+          answer.toLowerCase().includes(a.hostname.toLowerCase()) || 
+          answer.toLowerCase().includes(a.ip.toLowerCase())
+        );
+
+        let referenceCard: { hostname: string; ip: string; cve?: string; severity: "critical" | "high" | "medium" | "low" } | undefined;
+        if (matchedAsset) {
+          const maxCve = matchedAsset.cves?.[0]?.id;
+          referenceCard = {
+            hostname: matchedAsset.hostname,
+            ip: matchedAsset.ip,
+            cve: maxCve,
+            severity: matchedAsset.criticalAlertsCount > 0 ? "critical" as const : matchedAsset.highAlertsCount > 0 ? "high" as const : "medium" as const
+          };
+        }
+
+        // Emulate streaming increments for typing effect
+        const sentences = cleanContent.split("\n");
+        let currentSentenceIndex = 0;
+
+        const streamMsg: Message = {
+          role: "assistant",
+          content: "",
+          isStreaming: true
+        };
+        
+        setChatMessages(prev => [...prev, streamMsg]);
+
+        const interval = setInterval(() => {
+          if (currentSentenceIndex < sentences.length) {
+            const chunk = sentences.slice(0, currentSentenceIndex + 1).join("\n");
+            setChatMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                last.content = chunk;
+              }
+              return updated;
+            });
+            currentSentenceIndex++;
+          } else {
+            clearInterval(interval);
+            setChatMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                last.content = cleanContent;
+                last.isStreaming = false;
+                last.codeBlock = codeBlock;
+                last.referenceCard = referenceCard;
+              }
+              return updated;
+            });
           }
-        ]);
-      })
-      .catch((err) => {
+        }, 85);
+      },
+      onError: (err: any) => {
         setIsCopilotTyping(false);
-        console.error(err);
+        const errMsg = err?.response?.data?.error || err?.message || "RAG Copilot Pipeline failed.";
         setChatMessages(prev => [
           ...prev,
-          { role: "assistant" as const, content: "Error communicating with AI Copilot agent. Check backend operations." }
+          {
+            role: "assistant",
+            content: `Failed to query Security Copilot: ${errMsg}`
+          }
         ]);
-      });
+      }
+    });
   };
 
   const handleCopilotAction = (act: any) => {
@@ -279,17 +342,52 @@ export function ProtectedLayout() {
                 <p className="whitespace-pre-line">{msg.content}</p>
 
                 {/* Code Block if any */}
-                {msg.code && (
+                {msg.codeBlock && (
                   <div className="mt-3 overflow-hidden rounded-sm border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950">
                     <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100 px-3 py-1 dark:border-slate-700 dark:bg-slate-900">
-                      <span className="text-[9px] font-mono text-slate-500">{msg.language || "code"}</span>
+                      <span className="text-[9px] font-mono text-slate-500">{msg.codeBlock.language || "code"}</span>
                       <Terminal className="h-3 w-3 text-slate-400" />
                     </div>
                     <pre className="p-3 text-[10px] font-mono text-brand-accent overflow-x-auto">
-                      <code>{msg.code}</code>
+                      <code>{msg.codeBlock.code}</code>
                     </pre>
                   </div>
                 )}
+
+                {/* Reference Card if any */}
+                {msg.referenceCard && (() => {
+                  const refCard = msg.referenceCard;
+                  return (
+                    <div className="mt-3 rounded-lg border border-slate-200/60 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-200">
+                          {refCard.hostname}
+                        </span>
+                        <Badge severity={refCard.severity} className="h-4.5 px-1.5 text-[8px] font-bold">
+                          {refCard.severity.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 font-mono text-[9px] text-slate-500">
+                        <div>IP: {refCard.ip}</div>
+                        {refCard.cve && (
+                          <div>VULN: {refCard.cve}</div>
+                        )}
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="mt-3 w-full text-[9px] font-mono h-6.5 text-cyber-primary"
+                        onClick={() => {
+                          setIsCopilotOpen(false);
+                          navigate(`/endpoints/${refCard.hostname}`);
+                        }}
+                      >
+                        <Server className="mr-1 h-3 w-3" />
+                        LOAD ASSET DETAILS
+                      </Button>
+                    </div>
+                  );
+                })()}
 
                 {/* Simulated action triggers */}
                 {msg.actions && msg.actions.length > 0 && (
