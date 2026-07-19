@@ -1,14 +1,13 @@
 # 🛡️ VYUHA.AI
-> **AI-Powered Endpoint Detection & Response (EDR) Platform with Attack Path Intelligence and AI-Assisted Remediation**
+ **AI-Powered Endpoint Detection & Response (EDR) Platform with Attack Path Intelligence and AI-Assisted Remediation**
 
-# 📌 Overview
+# Overview
 VYUHA.AI is an AI-powered Endpoint Detection & Response (EDR) platform that transforms raw vulnerability scan data into actionable security intelligence.
 
 Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correlates vulnerabilities into probable attack paths, prioritizes risks using real-world threat intelligence, and assists analysts through an AI-powered SOC Copilot while keeping humans in complete control of remediation.
 
----
 
-# ✨ Features
+# Features
 - 🔍 Import vulnerability scans from **Nmap** and **OpenVAS**
 - ⚠️ Automatic CVE enrichment using **NVD API**
 - 🚨 CISA KEV exploitability detection
@@ -21,9 +20,8 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 - 🔔 Live Notifications
 - 🔐 JWT Authentication & Role-Based Access Control
 
----
 
-# 🏗️ System Architecture
+#  System Architecture
 
 ```text
              Nmap / OpenVAS
@@ -44,7 +42,6 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
  Dashboard • Reports • Notifications
 ```
 
----
 
 # 🛠️ Tech Stack
 ## Frontend
