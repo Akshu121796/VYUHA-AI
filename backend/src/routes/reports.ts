@@ -50,7 +50,7 @@ function buildPDFBuffer(findings: any[], assets: any[], approvals: any[], report
       
       // 1. Executive Summary Box
       doc.font("Helvetica-Bold").fontSize(12).fillColor("#0f172a").text("1. Executive Summary");
-      doc.moveTo(40, doc.y + 2).lineTo(550, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
+      doc.moveTo(40, doc.y + 2).lineTo(555, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
       doc.moveDown(0.8);
       
       const totalFindings = findings.length;
@@ -81,49 +81,82 @@ function buildPDFBuffer(findings: any[], assets: any[], approvals: any[], report
       
       // 2. Findings Table
       doc.font("Helvetica-Bold").fontSize(12).fillColor("#0f172a").text("2. Findings Table");
-      doc.moveTo(40, doc.y + 2).lineTo(550, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
+      doc.moveTo(40, doc.y + 2).lineTo(555, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
       doc.moveDown(0.8);
       
+      // autoTable columnStyles definitions (fixed widths)
+      const findingsColumnStyles = {
+        id: { x: 40, width: 85 },
+        asset: { x: 130, width: 90 },
+        cve: { x: 225, width: 60 },
+        severity: { x: 290, width: 45 },
+        cvss: { x: 340, width: 25 },
+        riskScore: { x: 370, width: 40 },
+        status: { x: 415, width: 40 },
+        category: { x: 460, width: 95 }
+      };
+
       // Header row
       let y = doc.y;
       doc.font("Helvetica-Bold").fontSize(8).fillColor("#475569");
-      doc.text("Finding ID", 40, y);
-      doc.text("Asset", 110, y);
-      doc.text("CVE", 195, y);
-      doc.text("Severity", 270, y);
-      doc.text("CVSS", 325, y);
-      doc.text("Risk Score", 360, y);
-      doc.text("Status", 395, y);
-      doc.text("Category", 445, y);
+      doc.text("Finding ID", findingsColumnStyles.id.x, y, { width: findingsColumnStyles.id.width });
+      doc.text("Asset", findingsColumnStyles.asset.x, y, { width: findingsColumnStyles.asset.width });
+      doc.text("CVE", findingsColumnStyles.cve.x, y, { width: findingsColumnStyles.cve.width });
+      doc.text("Severity", findingsColumnStyles.severity.x, y, { width: findingsColumnStyles.severity.width });
+      doc.text("CVSS", findingsColumnStyles.cvss.x, y, { width: findingsColumnStyles.cvss.width });
+      doc.text("Risk Score", findingsColumnStyles.riskScore.x, y, { width: findingsColumnStyles.riskScore.width });
+      doc.text("Status", findingsColumnStyles.status.x, y, { width: findingsColumnStyles.status.width });
+      doc.text("Category", findingsColumnStyles.category.x, y, { width: findingsColumnStyles.category.width });
       
       y += 12;
-      doc.moveTo(40, y).lineTo(550, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
+      doc.moveTo(40, y).lineTo(555, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
       y += 8;
       
       doc.font("Helvetica").fontSize(8).fillColor("#0f172a");
       findings.forEach((f) => {
-        if (y > 720) {
+        const hostnameText = f.hostname || "unknown";
+        const cveText = f.cve_id || "N/A";
+        const sevText = (f.severity || "LOW").toUpperCase();
+        const cvssText = String(f.cvss_score || 0);
+        const riskText = String(f.risk_score || 0);
+        const statusText = f.status || "open";
+        const categoryText = f.category || "Uncategorized";
+
+        // Display only first 8 chars followed by "..."
+        const idShort = (f.id || "").substring(0, 8) + "...";
+        const hId = doc.heightOfString(idShort, { width: findingsColumnStyles.id.width });
+        const hAsset = doc.heightOfString(hostnameText, { width: findingsColumnStyles.asset.width });
+        const hCve = doc.heightOfString(cveText, { width: findingsColumnStyles.cve.width });
+        const hSev = doc.heightOfString(sevText, { width: findingsColumnStyles.severity.width });
+        const hCvss = doc.heightOfString(cvssText, { width: findingsColumnStyles.cvss.width });
+        const hRisk = doc.heightOfString(riskText, { width: findingsColumnStyles.riskScore.width });
+        const hStatus = doc.heightOfString(statusText, { width: findingsColumnStyles.status.width });
+        const hCat = doc.heightOfString(categoryText, { width: findingsColumnStyles.category.width });
+        
+        const rowHeight = Math.max(hId, hAsset, hCve, hSev, hCvss, hRisk, hStatus, hCat);
+
+        if (y + rowHeight > 750) {
           doc.addPage();
           y = 50;
           
           doc.font("Helvetica-Bold").fontSize(8).fillColor("#475569");
-          doc.text("Finding ID", 40, y);
-          doc.text("Asset", 110, y);
-          doc.text("CVE", 195, y);
-          doc.text("Severity", 270, y);
-          doc.text("CVSS", 325, y);
-          doc.text("Risk Score", 360, y);
-          doc.text("Status", 395, y);
-          doc.text("Category", 445, y);
+          doc.text("Finding ID", findingsColumnStyles.id.x, y, { width: findingsColumnStyles.id.width });
+          doc.text("Asset", findingsColumnStyles.asset.x, y, { width: findingsColumnStyles.asset.width });
+          doc.text("CVE", findingsColumnStyles.cve.x, y, { width: findingsColumnStyles.cve.width });
+          doc.text("Severity", findingsColumnStyles.severity.x, y, { width: findingsColumnStyles.severity.width });
+          doc.text("CVSS", findingsColumnStyles.cvss.x, y, { width: findingsColumnStyles.cvss.width });
+          doc.text("Risk Score", findingsColumnStyles.riskScore.x, y, { width: findingsColumnStyles.riskScore.width });
+          doc.text("Status", findingsColumnStyles.status.x, y, { width: findingsColumnStyles.status.width });
+          doc.text("Category", findingsColumnStyles.category.x, y, { width: findingsColumnStyles.category.width });
           y += 12;
-          doc.moveTo(40, y).lineTo(550, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
+          doc.moveTo(40, y).lineTo(555, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
           y += 8;
           doc.font("Helvetica").fontSize(8).fillColor("#0f172a");
         }
         
-        doc.text(f.id, 40, y);
-        doc.text(f.hostname, 110, y, { width: 80, ellipsis: true });
-        doc.text(f.cve_id || "N/A", 195, y);
+        doc.text(idShort, findingsColumnStyles.id.x, y, { width: findingsColumnStyles.id.width });
+        doc.text(hostnameText, findingsColumnStyles.asset.x, y, { width: findingsColumnStyles.asset.width });
+        doc.text(cveText, findingsColumnStyles.cve.x, y, { width: findingsColumnStyles.cve.width });
         
         // Severity color
         const sevLower = (f.severity || "low").toLowerCase();
@@ -132,93 +165,118 @@ function buildPDFBuffer(findings: any[], assets: any[], approvals: any[], report
         else if (sevLower === "high") sevColor = "#f59e0b";
         else if (sevLower === "medium") sevColor = "#ca8a04";
         
-        doc.fillColor(sevColor).font("Helvetica-Bold").text(f.severity ? f.severity.toUpperCase() : "LOW", 270, y);
+        doc.fillColor(sevColor).font("Helvetica-Bold").text(sevText, findingsColumnStyles.severity.x, y, { width: findingsColumnStyles.severity.width });
         doc.fillColor("#0f172a").font("Helvetica");
         
-        doc.text(String(f.cvss_score || 0), 325, y);
-        doc.text(String(f.risk_score || 0), 360, y);
-        doc.text(f.status || "open", 395, y);
-        doc.text(f.category, 445, y, { width: 105, ellipsis: true });
+        doc.text(cvssText, findingsColumnStyles.cvss.x, y, { width: findingsColumnStyles.cvss.width });
+        doc.text(riskText, findingsColumnStyles.riskScore.x, y, { width: findingsColumnStyles.riskScore.width });
+        doc.text(statusText, findingsColumnStyles.status.x, y, { width: findingsColumnStyles.status.width });
+        doc.text(categoryText, findingsColumnStyles.category.x, y, { width: findingsColumnStyles.category.width });
         
-        y += 18;
+        y += rowHeight + 6;
       });
-      doc.y = y + 15;
+      doc.y = y + 8;
+      doc.x = 40;
       
       // 3. Assets Section
-      if (doc.y > 600) {
+      if (doc.y > 730) {
         doc.addPage();
       }
-      doc.font("Helvetica-Bold").fontSize(12).fillColor("#0f172a").text("3. Scanned Assets");
-      doc.moveTo(40, doc.y + 2).lineTo(550, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
+      doc.font("Helvetica-Bold").fontSize(12).fillColor("#0f172a")
+        .text("3. Scanned Assets", 40, doc.y);
+      doc.moveTo(40, doc.y + 2).lineTo(555, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
       doc.moveDown(0.8);
       
+      // autoTable columnStyles definitions (fixed widths)
+      const assetsColumnStyles = {
+        hostname: { x: 40, width: 150 },
+        ip: { x: 200, width: 100 },
+        criticality: { x: 310, width: 100 },
+        os: { x: 420, width: 135 }
+      };
+
       y = doc.y;
       doc.font("Helvetica-Bold").fontSize(8).fillColor("#475569");
-      doc.text("Hostname", 40, y);
-      doc.text("IP", 160, y);
-      doc.text("Criticality", 280, y);
-      doc.text("OS", 400, y);
+      doc.text("Hostname", assetsColumnStyles.hostname.x, y, { width: assetsColumnStyles.hostname.width });
+      doc.text("IP", assetsColumnStyles.ip.x, y, { width: assetsColumnStyles.ip.width });
+      doc.text("Criticality", assetsColumnStyles.criticality.x, y, { width: assetsColumnStyles.criticality.width });
+      doc.text("OS", assetsColumnStyles.os.x, y, { width: assetsColumnStyles.os.width });
       
       y += 12;
-      doc.moveTo(40, y).lineTo(550, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
+      doc.moveTo(40, y).lineTo(555, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
       y += 8;
       
       doc.font("Helvetica").fontSize(8).fillColor("#0f172a");
       assets.forEach((a) => {
-        if (y > 720) {
+        const hostnameText = a.hostname || "unknown";
+        const ipText = a.ip_address || "0.0.0.0";
+        const critText = (a.criticality || "LOW").toUpperCase();
+        const osText = a.os_type || "Ubuntu Server";
+
+        const hHost = doc.heightOfString(hostnameText, { width: assetsColumnStyles.hostname.width });
+        const hIp = doc.heightOfString(ipText, { width: assetsColumnStyles.ip.width });
+        const hCrit = doc.heightOfString(critText, { width: assetsColumnStyles.criticality.width });
+        const hOs = doc.heightOfString(osText, { width: assetsColumnStyles.os.width });
+        
+        const rowHeight = Math.max(hHost, hIp, hCrit, hOs);
+
+        if (y + rowHeight > 750) {
           doc.addPage();
           y = 50;
           
           doc.font("Helvetica-Bold").fontSize(8).fillColor("#475569");
-          doc.text("Hostname", 40, y);
-          doc.text("IP", 160, y);
-          doc.text("Criticality", 280, y);
-          doc.text("OS", 400, y);
+          doc.text("Hostname", assetsColumnStyles.hostname.x, y, { width: assetsColumnStyles.hostname.width });
+          doc.text("IP", assetsColumnStyles.ip.x, y, { width: assetsColumnStyles.ip.width });
+          doc.text("Criticality", assetsColumnStyles.criticality.x, y, { width: assetsColumnStyles.criticality.width });
+          doc.text("OS", assetsColumnStyles.os.x, y, { width: assetsColumnStyles.os.width });
           y += 12;
-          doc.moveTo(40, y).lineTo(550, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
+          doc.moveTo(40, y).lineTo(555, y).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
           y += 8;
           doc.font("Helvetica").fontSize(8).fillColor("#0f172a");
         }
         
-        doc.text(a.hostname, 40, y);
-        doc.text(a.ip_address || "0.0.0.0", 160, y);
+        doc.text(hostnameText, assetsColumnStyles.hostname.x, y, { width: assetsColumnStyles.hostname.width });
+        doc.text(ipText, assetsColumnStyles.ip.x, y, { width: assetsColumnStyles.ip.width });
         
         // Criticality style
         const critLower = (a.criticality || "low").toLowerCase();
         let critColor = "#64748b";
         if (critLower === "critical" || critLower === "high") critColor = "#ef4444";
-        doc.fillColor(critColor).font("Helvetica-Bold").text(a.criticality.toUpperCase(), 280, y);
+        doc.fillColor(critColor).font("Helvetica-Bold").text(critText, assetsColumnStyles.criticality.x, y, { width: assetsColumnStyles.criticality.width });
         doc.fillColor("#0f172a").font("Helvetica");
         
-        doc.text(a.os_type || "Ubuntu Server", 400, y);
-        y += 18;
+        doc.text(osText, assetsColumnStyles.os.x, y, { width: assetsColumnStyles.os.width });
+        y += rowHeight + 6;
       });
-      doc.y = y + 15;
+      doc.y = y + 8;
       
       // 4. Approval Summary Section
-      if (doc.y > 620) {
+      if (doc.y > 730) {
         doc.addPage();
       }
-      doc.font("Helvetica-Bold").fontSize(12).fillColor("#0f172a").text("4. Containment Action Approvals");
-      doc.moveTo(40, doc.y + 2).lineTo(550, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
+      doc.font("Helvetica-Bold").fontSize(12).fillColor("#0f172a")
+        .text("4. Containment Action Approvals", 40, doc.y);
+      doc.moveTo(40, doc.y + 2).lineTo(555, doc.y + 2).strokeColor("#cbd5e1").lineWidth(1).stroke();
       doc.moveDown(0.8);
       
       const approvedCount = approvals.filter(a => a.status === "approved").length;
       const rejectedCount = approvals.filter(a => a.status === "rejected").length;
       const pendingCount = approvals.filter(a => a.status === "pending").length;
       
-      doc.font("Helvetica").fontSize(10).fillColor("#334155");
-      doc.text(`Approved: ${approvedCount}`, { indent: 15 });
+      doc.font("Helvetica").fontSize(10).fillColor("#334155")
+        .text(`Approved: ${approvedCount}`, 40, doc.y, { indent: 15 });
       doc.moveDown(0.3);
-      doc.text(`Rejected: ${rejectedCount}`, { indent: 15 });
-      doc.moveDown(0.3);
-      doc.text(`Pending: ${pendingCount}`, { indent: 15 });
+      doc.text(`Rejected: ${rejectedCount}`, 40, doc.y, { indent: 15 });
+      doc.moveDown(0.3);  
+      doc.text(`Pending: ${pendingCount}`, 40, doc.y, { indent: 15 });
       doc.moveDown(1.5);
       
       // Footer: Printed on all pages
       let pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
+        const oldBottomMargin = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
         doc.font("Helvetica").fontSize(8).fillColor("#94a3b8");
         doc.text(
           "Generated by VYUHA AI SOC Console",
@@ -226,6 +284,7 @@ function buildPDFBuffer(findings: any[], assets: any[], approvals: any[], report
           800,
           { align: "center", width: 512 }
         );
+        doc.page.margins.bottom = oldBottomMargin;
       }
       
       doc.end();

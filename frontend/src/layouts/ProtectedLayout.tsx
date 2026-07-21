@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Navigate, Outlet, useSearchParams, useNavigate } from "react-router-dom";
-import { Sparkles, Terminal, Send, ArrowRight, Trash2, Server } from "lucide-react";
+import { Sparkles, Terminal, Send, ArrowRight, Trash2, Server, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
@@ -254,7 +254,23 @@ export function ProtectedLayout() {
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-background">
       {/* Collapsible Left Sidebar */}
-      <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} onNavigate={closeSidebarOnMobile} />
+      <div className="relative flex shrink-0 h-full overflow-visible">
+        <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} onNavigate={closeSidebarOnMobile} />
+        
+        {/* Floating circular collapse/expand button */}
+        <div className="absolute -right-3 top-8 z-50 hidden md:block overflow-visible">
+          <button
+            onClick={toggleSidebar}
+            className="relative z-50 flex items-center justify-center h-6 w-6 rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-all hover:border-cyber-primary hover:text-cyber-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          >
+            {isSidebarCollapsed ? (
+              <ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-100" />
+            ) : (
+              <ChevronLeft className="h-5 w-5 text-slate-700 dark:text-slate-100" />
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* Mobile Sidebar overlay backdrop */}
       <div

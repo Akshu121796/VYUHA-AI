@@ -1,20 +1,19 @@
 import React, { useState } from "react";
-import { 
-  Check, 
-  X, 
-  BookmarkCheck, 
-  AlertTriangle, 
-  Server, 
-  Zap, 
+import {
+  Check,
+  X,
+  BookmarkCheck,
+  AlertTriangle,
+  Server,
+  Zap,
   Info
 } from "lucide-react";
 import { useApprovalsData, useResolveApprovalMutation } from "../../hooks/queries/useVyuhaQueries";
 import { ApprovalTask } from "../../types";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/Card";
+import { Card, CardContent } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/Dialog";
-import { StatusPill } from "../../components/ui/StatusPill";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { cn } from "../../utils/cn";
 import { toast } from "sonner";
@@ -22,7 +21,7 @@ import { toast } from "sonner";
 export function ApprovalQueuePage() {
   const { data: tasks, isLoading } = useApprovalsData();
   const resolveMutation = useResolveApprovalMutation();
-  
+
   // Modal states
   const [selectedTask, setSelectedTask] = useState<ApprovalTask | null>(null);
   const [modalType, setModalType] = useState<"approve" | "reject" | null>(null);
@@ -56,7 +55,7 @@ export function ApprovalQueuePage() {
     if (!selectedTask || !modalType) return;
 
     const finalStatus = modalType === "approve" ? "approved" : "rejected";
-    
+
     resolveMutation.mutate({ id: selectedTask.id, status: finalStatus }, {
       onSuccess: () => {
         if (finalStatus === "approved") {
@@ -71,22 +70,22 @@ export function ApprovalQueuePage() {
 
   // Before / After states mapping for selected task
   const getTaskComparisons = (task: ApprovalTask) => {
-    switch (task.id) {
-      case "TASK-2026-901":
+    switch (task.action) {
+      case "terminate_process":
         return {
           before: "XZ Backdoor active on root shell PID 4410",
           after: "xz-utils dependency reinstalled to 5.4.1. Shell terminated.",
           impact: "Workstation network packages will experience a 10-second ping disruption.",
           reduction: "92%"
         };
-      case "TASK-2026-902":
+      case "isolate_host":
         return {
           before: "LSASS memory handle read queries allowed dynamically",
           after: "Registry RunAsPPL key enabled. LSASS queries isolated.",
           impact: "Requires target system restart to load registry keys. Incurs 2-minute server pause.",
           reduction: "84%"
         };
-      case "TASK-2026-903":
+      case "block_ip":
         return {
           before: "IP 185.220.101.44 SSH brute-forcing allowed",
           after: "IP banned at border firewalls. Active SSH campaigns contained.",
@@ -124,7 +123,7 @@ export function ApprovalQueuePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full min-w-0">
       {/* Header */}
       <div className="border-b border-slate-200/70 pb-5 dark:border-slate-800/70">
         <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans dark:text-slate-100">
@@ -136,16 +135,16 @@ export function ApprovalQueuePage() {
       </div>
 
       {/* Main Split Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-        
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start w-full min-w-0">
+
         {/* Pending Actions List (2/3 width) */}
-        <div className="xl:col-span-2 space-y-4">
+        <div className="xl:col-span-2 space-y-4 w-full min-w-0">
           <h2 className="text-xs font-mono font-bold tracking-wider text-slate-400 uppercase pl-1">
             Pending Remediation Requests ({pendingTasks.length})
           </h2>
 
           {pendingTasks.length === 0 ? (
-            <Card className="border-dashed border-slate-200 bg-white/80 py-16 text-center rounded-[20px] shadow-sm dark:border-slate-700 dark:bg-slate-950/70">
+            <Card className="border-dashed border-slate-200 bg-white/80 py-16 text-center rounded-[20px] shadow-sm dark:border-slate-700 dark:bg-slate-950/70 w-full">
               <CardContent className="space-y-3">
                 <BookmarkCheck className="mx-auto h-10 w-10 text-cyber-low" />
                 <p className="text-sm font-sans font-semibold text-slate-800">All playbooks authorized</p>
@@ -153,13 +152,13 @@ export function ApprovalQueuePage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full min-w-0">
               {pendingTasks.map((task: ApprovalTask) => {
                 const cmp = getTaskComparisons(task);
                 const badgeSeverity = getTaskSeverity(task);
                 const hostname = getTaskHostname(task);
                 return (
-                  <Card key={task.id} className="relative flex min-h-[220px] flex-col justify-between overflow-hidden rounded-[20px] border-slate-200 bg-white/90 shadow-card transition-premium hover:border-brand-accent/40 hover:shadow-premium dark:border-slate-800 dark:bg-slate-950/80">
+                  <Card key={task.id} className="relative flex min-h-[220px] flex-col justify-between overflow-hidden rounded-[20px] border-slate-200 bg-white/90 shadow-card transition-premium hover:border-brand-accent/40 hover:shadow-premium dark:border-slate-800 dark:bg-slate-950/80 w-full min-w-0">
                     {/* Severity colored indicator line */}
                     <div className={cn(
                       "absolute top-0 left-0 right-0 h-[1.5px]",
@@ -168,52 +167,72 @@ export function ApprovalQueuePage() {
                       badgeSeverity === "medium" && "bg-cyber-medium"
                     )} />
 
-                    <div className="p-4.5 space-y-3.5">
+                    <div className="p-4 space-y-3.5 w-full min-w-0 overflow-hidden">
                       {/* Header info */}
-                      <div className="flex justify-between items-center">
-                        <span className="font-mono text-[9px] font-bold text-slate-400">{task.id}</span>
-                        <Badge severity={badgeSeverity}>{badgeSeverity}</Badge>
+                      <div className="grid grid-cols-[1fr_auto] gap-2 items-start w-full">
+                        <div className="min-w-0">
+                          <span className="font-mono text-[9px] font-bold text-slate-400 leading-tight block w-full"
+                            style={{
+                              overflowWrap: "anywhere",
+                              wordBreak: "break-all",
+                              maxWidth: "100%",
+                              display: "block"
+                            }}>
+                            {(task.id || "").slice(0, 8)}...{(task.id || "").slice(-8)}
+                          </span>
+                        </div>
+                        <Badge severity={badgeSeverity} className="self-start whitespace-nowrap shrink-0">{badgeSeverity}</Badge>
                       </div>
 
                       {/* Endpoint specs */}
-                      <div className="flex items-center space-x-2 font-mono text-[10.5px]">
-                        <Server className="h-3.5 w-3.5 text-cyber-primary" />
-                        <span className="text-slate-800 font-bold">{hostname}</span>
+                      <div className="flex items-center space-x-2 font-mono text-[10.5px] w-full min-w-0 overflow-hidden">
+                        <Server className="h-3.5 w-3.5 text-cyber-primary shrink-0" />
+                        <span
+                          className="text-slate-800 font-bold block shrink min-w-0 overflow-hidden break-all break-words text-left"
+                          style={{ overflowWrap: "anywhere" }}
+                        >
+                          {hostname}
+                        </span>
                       </div>
 
                       {/* Recommended Fix */}
-                      <div className="space-y-1">
+                      <div className="space-y-1 w-full min-w-0 overflow-hidden">
                         <span className="text-[9px] font-mono uppercase text-slate-450 block font-semibold">Recommended Fix</span>
-                        <p className="text-xs font-semibold text-slate-800 leading-tight">
+                        <p
+                          className="text-xs font-semibold text-slate-800 leading-tight block shrink min-w-0 overflow-hidden break-all break-words text-left"
+                          style={{ overflowWrap: "anywhere" }}
+                        >
                           {task.action}
                         </p>
                       </div>
 
                       {/* Risk Reduction Rating */}
-                      <div className="flex items-center gap-1.5 font-mono text-[10px] text-cyber-low bg-green-50 border border-green-100 px-2 py-1 rounded w-fit shadow-sm">
+                      <div className="flex items-center gap-1.5 font-mono text-[10px] text-cyber-low bg-green-50 border border-green-100 px-2 py-1 rounded w-fit shadow-sm shrink-0">
                         <Zap className="h-3 w-3 fill-cyber-low/10" />
                         <span className="font-bold">-{cmp.reduction} RISK REDUCTION</span>
                       </div>
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex gap-2 border-t border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                    <div className="flex gap-2 border-t border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/70 w-full min-w-0">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 font-mono text-[9.5px] border-slate-200 text-slate-600 hover:bg-slate-50"
+                        className="flex-1 font-mono text-[9.5px] border-slate-200 text-slate-600 hover:bg-slate-50 min-w-0 overflow-hidden break-all break-words"
+                        style={{ overflowWrap: "anywhere" }}
                         onClick={() => handleOpenModal(task, "reject")}
                       >
-                        <X className="mr-1 h-3 w-3 text-slate-400" />
+                        <X className="mr-1 h-3 w-3 text-slate-400 shrink-0" />
                         REJECT
                       </Button>
                       <Button
                         variant="cyber"
                         size="sm"
-                        className="flex-1 font-mono text-[9.5px]"
+                        className="flex-1 font-mono text-[9.5px] min-w-0 overflow-hidden break-all break-words"
+                        style={{ overflowWrap: "anywhere" }}
                         onClick={() => handleOpenModal(task, "approve")}
                       >
-                        <Check className="mr-1 h-3 w-3" />
+                        <Check className="mr-1 h-3 w-3 shrink-0" />
                         APPROVE & EXECUTE
                       </Button>
                     </div>
@@ -225,38 +244,77 @@ export function ApprovalQueuePage() {
         </div>
 
         {/* Action Audit Logs (1/3 width) */}
-        <div className="space-y-4">
-          <h2 className="text-xs font-mono font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5 pl-1">
+        <div className="space-y-4 w-full min-w-0">
+          <h2 className="text-xs font-mono font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5 pl-1 shrink-0">
             <BookmarkCheck className="h-4 w-4 text-cyber-low" /> History Audit Logs
           </h2>
 
-          <Card className="overflow-hidden rounded-[20px] border-slate-200 bg-white/90 shadow-card dark:border-slate-800 dark:bg-slate-950/80">
-            <CardContent className="p-0">
-              <div className="divide-y divide-slate-100">
+          <Card className="overflow-hidden rounded-[20px] border-slate-200 bg-white/90 shadow-card dark:border-slate-800 dark:bg-slate-950/80 w-full min-w-0">
+            <CardContent className="p-0 w-full min-w-0">
+              <div className="divide-y divide-slate-100 w-full min-w-0">
                 {completedTasks.length === 0 ? (
-                  <div className="py-12 text-center text-xs font-mono text-slate-400">
+                  <div className="py-12 text-center text-xs font-mono text-slate-400 w-full">
                     No historic overrides recorded in this session.
                   </div>
                 ) : (
                   completedTasks.map((task: ApprovalTask) => (
-                    <div key={task.id} className="p-4.5 space-y-2 text-xs font-mono">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-700">{task.id}</span>
-                        <span className={cn(
-                          "text-[9px] uppercase font-bold px-1.5 py-0.2 rounded border",
-                          task.status === "approved" 
-                            ? "bg-green-50 text-cyber-low border-green-150" 
-                            : "bg-slate-50 text-slate-400 border-slate-200"
-                        )}>
+                    <div key={task.id} className="p-4 space-y-2 text-xs font-mono w-full min-w-0 overflow-hidden">
+                      <div className="flex items-start gap-2 w-full">
+                        <div className="flex-1 min-w-0 overflow-hidden">
+
+                          <span
+                            className="block font-bold text-slate-700 leading-tight"
+                            style={{
+                              overflowWrap: "anywhere",
+                              wordBreak: "break-word",
+                              whiteSpace: "normal"
+                            }}
+                          >
+                            {`${task.id.slice(0, 8)}...${task.id.slice(-8)}`}
+                          </span>
+
+                        </div>
+                        <span
+                          className={cn(
+                            "text-[9px] uppercase font-bold px-1.5 py-0.5 rounded border shrink-0",
+                            task.status === "approved"
+                              ? "bg-green-50 text-cyber-low border-green-150"
+                              : "bg-slate-50 text-slate-400 border-slate-200"
+                          )}
+                        >
                           {task.status}
                         </span>
+
                       </div>
-                      <p className="text-[11px] text-slate-650 font-sans leading-snug">
+                      <p
+                        className="text-[11px] text-slate-650 leading-snug mt-2"
+                        style={{
+                          overflowWrap: "anywhere"
+                        }}
+                      >
                         {task.action}
                       </p>
-                      <div className="flex items-center justify-between text-[8.5px] text-slate-400 pt-1">
-                        <span>Target: {getTaskHostname(task)}</span>
-                        <span>Operator: Kaveesh</span>
+                      <div className="grid grid-cols-2 gap-2 mt-2 text-[8.5px]">
+                        <div className="min-w-0">
+                          <div className="text-slate-400">Target</div>
+                          <div
+                            style={{
+                              overflowWrap: "anywhere"
+                            }}
+                          >
+                            {getTaskHostname(task)}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-slate-400">
+                            Operator
+                          </div>
+
+                          <div>
+                            Kaveesh
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))

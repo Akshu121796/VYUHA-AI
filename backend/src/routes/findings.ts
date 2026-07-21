@@ -34,6 +34,7 @@ export default async function findingsRoutes(app: FastifyInstance) {
         const asset = f.asset_id ? assetsMap.get(f.asset_id) : null;
         return {
           id: f.id,
+          cve_id: f.cve_id,
           title: f.description || f.cve_id || "Security Finding",
           category: mapCategory(f.vuln_category),
           severity: (f.severity || "low").toLowerCase(),
@@ -96,6 +97,7 @@ export default async function findingsRoutes(app: FastifyInstance) {
       const asset = data.asset_id ? (await db.from("assets").select("hostname, ip_address").eq("id", data.asset_id).single()).data : null;
       return {
         id: data.id,
+        cve_id: data.cve_id,
         title: data.description || data.cve_id || "Security Finding",
         category: mapCategory(data.vuln_category),
         severity: (data.severity || "low").toLowerCase(),

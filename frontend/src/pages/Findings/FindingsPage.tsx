@@ -11,7 +11,6 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { 
-  ShieldAlert, 
   Search, 
   ArrowRight, 
   ShieldX, 
@@ -90,12 +89,14 @@ export function FindingsPage() {
         accessorKey: "id",
         header: "CVE / Incident",
         cell: (info) => {
-          const row = info.row.original;
-          const cveId = row.id === "INC-2026-0041" ? "CVE-2021-34527" : row.id === "INC-2026-0042" ? "CVE-2024-3094" : row.id === "INC-2026-0044" ? "CVE-2023-38408" : "N/A";
+          const row = info.row.original as any;
+          const cveId = row.cve_id ? row.cve_id : "No CVE";
           return (
             <div className="space-y-0.5">
               <span className="font-mono font-bold text-foreground block">{cveId}</span>
-              <span className="text-[9px] text-zinc-500 block font-mono">{row.id}</span>
+              <span className="text-[9px] text-zinc-500 block font-mono">
+                {(row.id || "").slice(0, 8)}...{(row.id || "").slice(-8)}
+              </span>
             </div>
           );
         }
