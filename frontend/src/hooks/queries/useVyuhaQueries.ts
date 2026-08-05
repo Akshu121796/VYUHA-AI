@@ -34,6 +34,7 @@ export function useUpdateIncidentMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["attack-graph"] });
     }
   });
 }
@@ -46,6 +47,7 @@ export function useResetTelemetryMutation() {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["attack-graph"] });
     }
   });
 }
@@ -122,6 +124,7 @@ export function useResolveApprovalMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["approvals"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["attack-graph"] });
     }
   });
 }

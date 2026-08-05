@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, ShieldAlert, Monitor, Settings, FileText, CheckSquare, MessageSquare, Landmark } from "lucide-react";
-import { mockEndpoints } from "../services/mockData";
 import { cn } from "../utils/cn";
+import { useEndpointsData } from "../hooks/queries/useVyuhaQueries";
 
 interface CommandMenuProps {
   isOpen: boolean;
@@ -19,10 +19,19 @@ interface CommandItem {
 
 export function CommandMenu({ isOpen, onClose }: CommandMenuProps) {
   const navigate = useNavigate();
+  const { data: endpoints } = useEndpointsData();
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const endpointCommands = (endpoints || []).map((ep: any) => ({
+    id: `ep-${ep.id}`,
+    title: `Host profile: ${ep.hostname} (${ep.ip} - ${ep.os})`,
+    category: "Endpoints" as const,
+    icon: <Monitor className="h-4 w-4 text-brand-secondary" />,
+    action: () => navigate(`/endpoints/${ep.id}`)
+  }));
 
   // Command database
   const commands: CommandItem[] = [
@@ -35,13 +44,7 @@ export function CommandMenu({ isOpen, onClose }: CommandMenuProps) {
     { id: "settings", title: "Settings & API Integrations", category: "Navigation", icon: <Settings className="h-4 w-4" />, action: () => navigate("/settings") },
     
     // Dynamically map endpoints to the command list
-    ...mockEndpoints.map(ep => ({
-      id: `ep-${ep.id}`,
-      title: `Host profile: ${ep.hostname} (${ep.ip} - ${ep.os})`,
-      category: "Endpoints" as const,
-      icon: <Monitor className="h-4 w-4 text-brand-secondary" />,
-      action: () => navigate(`/endpoints/${ep.id}`)
-    })),
+    ...endpointCommands,
 
     // Quick Actions
     { id: "act-copilot", title: "Ask Copilot to scan for vulnerabilities", category: "Quick Actions", icon: <MessageSquare className="h-4 w-4 text-brand-accent" />, action: () => navigate("/copilot?query=scan+vulnerabilities") }

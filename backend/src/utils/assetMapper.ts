@@ -170,7 +170,7 @@ export function getProcessesForAsset(assetId: string, hostname: string, os: stri
 }
 
 export function mapAssetToEndpoint(asset: any, dbFindings: any[]): Endpoint {
-  const assetFindings = dbFindings.filter((f) => f.asset_id === asset.id);
+  const assetFindings = dbFindings.filter((f) => f.asset_id === asset.id && f.status === "open");
   const mappedOs = mapOsType(asset.os_type);
   
   const cves = assetFindings

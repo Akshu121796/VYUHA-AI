@@ -1,15 +1,16 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   Handle,
   Position,
   NodeProps,
-  MarkerType
+  MarkerType,
+  ReactFlowProvider,
+  useReactFlow
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { 
@@ -22,13 +23,18 @@ import {
   Sparkles, 
   Flame, 
   CornerDownRight, 
-  Compass
+  Compass,
+  Monitor
 } from "lucide-react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../utils/cn";
 import { toast } from "sonner";
-import { useAttackGraphData } from "../../hooks/queries/useVyuhaQueries";
+import { useAttackGraphData, useIncidentsData } from "../../hooks/queries/useVyuhaQueries";
+import dagre from "dagre";
+import ELK from "elkjs/lib/elk.bundled.js";
+
+const elk = new ELK();
 
 // Node Interface details
 interface AttackNodeData {
@@ -36,137 +42,473 @@ interface AttackNodeData {
   subtitle: string;
   label: string;
   severity: "critical" | "high" | "medium" | "low";
-  icon: React.ReactNode;
-  tooltip: string;
+  icon: string;
   ip: string;
   description: string;
-  mitigations: string[];
+  findingsCount: number;
+  opacity: number;
+  cves: string[];
+  tactics: string[];
+  isInSelectedChain: boolean;
+  isNodeSelected: boolean;
+  isHighlighted: boolean;
 }
 
 // Icon mapping registry for backend-driven serialization keys
 const ICON_MAP: Record<string, React.ReactNode> = {
-  "key": <Key className="h-4 w-4" />,
-  "terminal": <Terminal className="h-4 w-4" />,
-  "shield-alert": <ShieldAlert className="h-4 w-4 animate-pulse" />,
-  "network": <Network className="h-4 w-4" />,
-  "shield-check": <ShieldCheck className="h-4 w-4" />
+  "key": <Key className="h-3.5 w-3.5" />,
+  "terminal": <Terminal className="h-3.5 w-3.5" />,
+  "shield-alert": <ShieldAlert className="h-3.5 w-3.5" />,
+  "network": <Network className="h-3.5 w-3.5" />,
+  "shield-check": <ShieldCheck className="h-3.5 w-3.5" />
 };
 
-// Custom React Flow Node Component
+// Helper to resolve icon key based on asset type
+function getIconForAsset(type: string): string {
+  const t = type.toLowerCase();
+  if (t.includes("web") || t.includes("portal")) return "terminal";
+  if (t.includes("db") || t.includes("postgres") || t.includes("database") || t.includes("mysql") || t.includes("sql")) return "shield-alert";
+  if (t.includes("domain") || t.includes("controller") || t.includes("admin")) return "shield-check";
+  if (t.includes("app") || t.includes("application") || t.includes("auth")) return "network";
+  return "key";
+}
+
+// Custom React Flow Node Component (Dark, Compact, hover tooltip enabled)
 const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
   const renderIcon = () => {
-    if (typeof data.icon === "string") {
-      return ICON_MAP[data.icon] || <ShieldAlert className="h-4 w-4" />;
-    }
-    return data.icon;
+    return ICON_MAP[data.icon] || <ShieldAlert className="h-3.5 w-3.5" />;
   };
 
+  const isInChain = data.isInSelectedChain;
+  const isSelected = data.isNodeSelected;
+  const isHighlighted = data.isHighlighted;
+
   return (
-    <div className={cn(
-      "px-4 py-3 rounded-md bg-white border flex items-center space-x-3 text-left max-w-[220px] select-none group relative transition-premium shadow-card hover:shadow-premium",
-      data.severity === "critical" && "border-slate-200 hover:border-cyber-critical shadow-[0_4px_12px_rgba(239,68,68,0.05)]",
-      data.severity === "high" && "border-slate-200 hover:border-cyber-high shadow-[0_4px_12px_rgba(249,115,22,0.05)]",
-      data.severity === "medium" && "border-slate-200 hover:border-cyber-medium shadow-[0_4px_12px_rgba(234,179,8,0.05)]",
-      data.severity === "low" && "border-slate-200 hover:border-cyber-low shadow-[0_4px_12px_rgba(34,197,94,0.05)]"
-    )}>
-      {/* Target port connections */}
-      {data.id !== "node-1" && data.id !== "weak-credentials" && (
-        <Handle 
-          type="target" 
-          position={Position.Left} 
-          style={{ background: "#2563eb", border: "1.5px solid #ffffff", width: 8, height: 8 }} 
-        />
+    <div 
+      style={{ opacity: isHighlighted ? 1.0 : 0.25 }}
+      className={cn(
+        "px-3 py-2.5 rounded-lg border text-left min-w-[210px] w-auto select-none group relative transition-all shadow-md cursor-pointer",
+        "bg-slate-900",
+        isHighlighted
+          ? (isInChain 
+              ? "border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)]" 
+              : "border-blue-500/70 shadow-[0_0_12px_rgba(59,130,246,0.15)]")
+          : "border-slate-800",
+        isSelected && "ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-950"
       )}
+    >
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        style={{ background: isInChain ? "#ef4444" : "#3b82f6", border: "1.5px solid #0f172a", width: 7, height: 7 }} 
+      />
 
-      {/* Side color ribbon */}
-      <span className={cn(
-        "absolute left-0 top-2 bottom-2 w-[3px] rounded-r",
-        data.severity === "critical" && "bg-cyber-critical",
-        data.severity === "high" && "bg-cyber-high",
-        data.severity === "medium" && "bg-cyber-medium",
-        data.severity === "low" && "bg-cyber-low"
-      )} />
+      <div className="flex items-center space-x-2.5">
+        {/* Pulsing indicator dot */}
+        <span className={cn(
+          "h-2 w-2 rounded-full shrink-0",
+          isInChain ? "bg-red-500 animate-pulse" : "bg-blue-400"
+        )} />
 
-      {/* Node Icon */}
-      <div className={cn(
-        "h-8 w-8 rounded flex items-center justify-center border shrink-0 ml-1",
-        data.severity === "critical" && "bg-red-50 border-red-100 text-cyber-critical",
-        data.severity === "high" && "bg-amber-50 border-amber-100 text-cyber-high",
-        data.severity === "medium" && "bg-yellow-50 border-yellow-100 text-cyber-medium",
-        data.severity === "low" && "bg-green-50 border-green-100 text-cyber-low"
-      )}>
-        {renderIcon()}
+        {/* Node details */}
+        <div className="min-w-0 flex-1">
+          <span className="text-[11px] font-bold text-slate-100 block leading-tight truncate">
+            {data.label}
+          </span>
+          <span className="text-[8.5px] font-mono text-slate-400 block mt-0.5 leading-none truncate">
+            {data.subtitle}
+          </span>
+        </div>
+
+        {/* Findings Badge */}
+        <div className={cn(
+          "px-1.5 py-0.5 rounded text-[9.5px] font-bold font-mono shrink-0",
+          isInChain ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-slate-800 text-slate-300 border border-slate-700"
+        )}>
+          {data.findingsCount}
+        </div>
       </div>
 
-      {/* Node details */}
-      <div className="min-w-0 flex-1">
-        <span className="text-[8px] font-mono text-slate-400 uppercase tracking-wider block leading-none">
-          {data.subtitle}
-        </span>
-        <span className="text-[11px] font-bold font-sans text-slate-800 mt-1 block leading-none truncate">
-          {data.label}
-        </span>
-      </div>
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        style={{ background: isInChain ? "#ef4444" : "#3b82f6", border: "1.5px solid #0f172a", width: 7, height: 7 }} 
+      />
 
-      {/* Source port connections */}
-      {data.id !== "node-5" && data.id !== "domain-admin" && (
-        <Handle 
-          type="source" 
-          position={Position.Right} 
-          style={{ background: "#2563eb", border: "1.5px solid #ffffff", width: 8, height: 8 }} 
-        />
-      )}
+      {/* Rich Hover Tooltip */}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 w-64 p-3 rounded-lg bg-slate-950 border border-slate-800 text-[10px] text-slate-200 leading-normal opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-premium">
+        <div className="border-b border-slate-800 pb-1.5 mb-1.5 flex justify-between items-center">
+          <span className="font-mono text-[8px] uppercase font-bold text-blue-400">NODE TELEMETRY</span>
+          <span className="text-[8px] font-mono text-slate-400">{data.ip}</span>
+        </div>
+        
+        <div className="space-y-1.5 font-sans text-left">
+          <p><strong className="text-slate-450 font-mono text-[9px]">Hostname:</strong> <span className="text-slate-100 font-semibold">{data.label}</span></p>
+          <p><strong className="text-slate-455 font-mono text-[9px]">Type:</strong> {data.subtitle}</p>
+          <p><strong className="text-slate-455 font-mono text-[9px]">Severity:</strong> <span className={cn(
+            "uppercase font-semibold",
+            data.severity === "critical" && "text-red-400",
+            data.severity === "high" && "text-orange-400",
+            data.severity === "medium" && "text-yellow-400",
+            data.severity === "low" && "text-green-400"
+          )}>{data.severity}</span></p>
+          <p><strong className="text-slate-455 font-mono text-[9px]">Open Findings:</strong> {data.findingsCount}</p>
+          
+          {data.cves && data.cves.length > 0 && (
+            <div className="pt-1 border-t border-slate-900 mt-1">
+              <strong className="text-slate-455 font-mono text-[8.5px] block mb-1">CVEs:</strong>
+              <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                {data.cves.map((cve: string, idx: number) => (
+                  <span key={idx} className="text-[8px] font-mono bg-red-950/40 text-red-300 border border-red-900/30 px-1 rounded">
+                    {cve}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Dynamic Hover Tooltip Bubble */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 w-52 p-2.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] font-sans text-slate-200 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-premium text-center">
-        <span className="font-mono text-[8px] uppercase font-bold text-cyber-primary block mb-1">DETECTION OVERVIEW</span>
-        {data.tooltip}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+          {data.tactics && data.tactics.length > 0 && (
+            <div className="pt-1 border-t border-slate-900 mt-1">
+              <strong className="text-slate-455 font-mono text-[8.5px] block mb-1">MITRE Tactics:</strong>
+              <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                {data.tactics.map((tactic: string, idx: number) => (
+                  <span key={idx} className="text-[8px] font-mono bg-blue-950/40 text-blue-300 border border-blue-900/30 px-1 rounded">
+                    {tactic}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-950" />
       </div>
     </div>
   );
 };
 
+// ELK.js Layout function for automatic placement
+const elkLayout = async (nodes: any[], edges: any[]) => {
+  const elkGraph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "RIGHT",
+      "elk.spacing.nodeNode": "100",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "150",
+      "elk.padding": "[top=50,left=50,bottom=50,right=50]",
+      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP"
+    },
+    children: nodes.map((node) => ({
+      id: node.id,
+      width: 220,
+      height: 60
+    })),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      sources: [edge.source],
+      targets: [edge.target]
+    }))
+  };
+
+  try {
+    const layoutedGraph = await elk.layout(elkGraph);
+    return nodes.map((node) => {
+      const elkNode = layoutedGraph.children?.find((c) => c.id === node.id);
+      return {
+        ...node,
+        position: {
+          x: elkNode?.x ?? 0,
+          y: elkNode?.y ?? 0
+        }
+      };
+    });
+  } catch (err) {
+    console.error("ELK layout failed", err);
+    return nodes.map((node, idx) => ({
+      ...node,
+      position: {
+        x: idx * 250,
+        y: 100
+      }
+    }));
+  }
+};
+
+// React Flow Canvas Wrapper Component
+interface CanvasProps {
+  rfNodes: any[];
+  rfEdges: any[];
+  onNodesChange: any;
+  onEdgesChange: any;
+  nodeTypes: any;
+  handleNodeClick: (id: string) => void;
+  handleEdgeClick: (edge: any) => void;
+}
+
+function AttackGraphCanvas({
+  rfNodes,
+  rfEdges,
+  onNodesChange,
+  onEdgesChange,
+  nodeTypes,
+  handleNodeClick,
+  handleEdgeClick
+}: CanvasProps) {
+  const { fitView } = useReactFlow();
+
+  // Automatically adapt viewport scale when nodes refresh or selection changes
+  useEffect(() => {
+    if (rfNodes.length > 0) {
+      const timer = setTimeout(() => {
+        const highlightedNodes = rfNodes.filter(n => n.data.isHighlighted);
+        if (highlightedNodes.length > 0 && highlightedNodes.length < rfNodes.length) {
+          fitView({ nodes: highlightedNodes, padding: 0.3, duration: 400 });
+        } else {
+          fitView({ padding: 0.2, duration: 400 });
+        }
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [rfNodes, fitView]);
+
+  return (
+    <ReactFlow
+      nodes={rfNodes}
+      edges={rfEdges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      nodeTypes={nodeTypes}
+      onNodeClick={(_, node) => handleNodeClick(node.id)}
+      onEdgeClick={(_, edge) => handleEdgeClick(edge)}
+      zoomOnScroll
+      zoomOnPinch
+      panOnDrag
+      fitView
+      attributionPosition="bottom-left"
+    >
+      <Background color="#1e293b" gap={20} size={1} />
+      <Controls className="bg-slate-900 border border-slate-800 text-slate-400 rounded-md shadow-md [&_button]:border-slate-800 [&_button]:bg-slate-900 [&_button]:text-slate-400 [&_button:hover]:bg-slate-800" />
+    </ReactFlow>
+  );
+}
+
 export function AttackGraphPage() {
   const navigate = useNavigate();
-  const { data: graphData, isLoading } = useAttackGraphData();
+  const { data: responseData, isLoading } = useAttackGraphData();
+  const { data: incidentsData } = useIncidentsData();
 
-  // Custom components registration for React Flow
   const nodeTypes = useMemo(() => ({
     attackNode: CustomAttackNode
   }), []);
 
-  const [selectedNodeId, setSelectedNodeId] = useState<string>("");
+  const [selectedChainId, setSelectedChainId] = useState<string>("all");
+  const [selectedNodeId, setSelectedNodeId] = useState<string>("all");
+  const [devMode, setDevMode] = useState<boolean>(false);
+  const [selectedEdge, setSelectedEdge] = useState<any>(null);
+
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
 
-  // Sync React Flow state with query data
-  React.useEffect(() => {
-    if (graphData?.nodes) {
-      setRfNodes(graphData.nodes);
-    }
-    if (graphData?.edges) {
-      setRfEdges(graphData.edges);
-    }
-    if (graphData?.nodes && graphData.nodes.length > 0) {
-      // Default to privilege-escalation or second node if present, else first
-      const defaultNode = graphData.nodes.find((n: any) => n.id === "privilege-escalation" || n.id === "node-2") || graphData.nodes[0];
-      setSelectedNodeId(defaultNode.id);
-    }
-  }, [graphData, setRfNodes, setRfEdges]);
+  // Safely extract chains and edges from custom backend layout wrapper
+  const chains = useMemo(() => responseData?.chains || [], [responseData]);
+  const backendEdges = useMemo(() => responseData?.edges || [], [responseData]);
 
-  // Retrieve selected node context
-  const selectedNode = useMemo(() => {
-    if (!graphData?.nodes) return null;
-    const node = graphData.nodes.find((n: any) => n.id === selectedNodeId) || graphData.nodes[0];
-    return node ? node.data : null;
-  }, [selectedNodeId, graphData]);
+  // Union list of unique assets across all threat vectors
+  const uniqueAssetsList = useMemo(() => {
+    return responseData?.nodes || [];
+  }, [responseData]);
+
+  // Sync nodes and edges on change in findings/selection states
+  useEffect(() => {
+    if (!responseData || !responseData.nodes || responseData.nodes.length === 0) return;
+
+    const activeChain = selectedChainId === "all" ? null : chains.find((c: any) => c.id === selectedChainId);
+
+    // Track neighbor sets for node-selection highlighting
+    const neighbors = new Set<string>();
+    const connectingEdges = new Set<string>();
+
+    const targetNodeId = selectedNodeId === "all" ? "" : selectedNodeId;
+
+    // Map React Flow nodes
+    const rawNodes = uniqueAssetsList.map((asset: any) => {
+      const isInChain = activeChain 
+        ? activeChain.path.some((n: any) => n.id === asset.id) 
+        : asset.isInAttackChain;
+      
+      // Determine dynamic highlighting flags
+      const isNodeSelected = targetNodeId === asset.id;
+      let isNeighbor = false;
+
+      backendEdges.forEach((edge: any) => {
+        if (targetNodeId) {
+          if (edge.source === targetNodeId && edge.target === asset.id) {
+            isNeighbor = true;
+            connectingEdges.add(`edge-${edge.source}-${edge.target}`);
+          }
+          if (edge.target === targetNodeId && edge.source === asset.id) {
+            isNeighbor = true;
+            connectingEdges.add(`edge-${edge.source}-${edge.target}`);
+          }
+        }
+      });
+
+      let isHighlighted = true;
+      if (targetNodeId) {
+        isHighlighted = isNodeSelected || isNeighbor;
+      } else if (activeChain) {
+        isHighlighted = isInChain;
+      }
+
+      return {
+        id: asset.id,
+        type: "attackNode",
+        data: {
+          id: asset.id,
+          subtitle: asset.assetType,
+          label: asset.assetName,
+          severity: asset.severity || "medium",
+          findingsCount: asset.findings || 0,
+          ip: asset.ip || "0.0.0.0",
+          description: asset.description || `Active telemetry findings on ${asset.assetName}.`,
+          cves: asset.cves || [],
+          tactics: asset.tactics || [],
+          isInSelectedChain: isInChain,
+          isNodeSelected,
+          isHighlighted
+        },
+        position: { x: 0, y: 0 }
+      };
+    });
+
+    // Build edges from inferred backend edges list
+    const edges = backendEdges.map((edge: any) => {
+      const isSelectedChain = activeChain 
+        ? activeChain.path.some((n: any) => n.id === edge.source) && activeChain.path.some((n: any) => n.id === edge.target)
+        : chains.some((c: any) => c.path.some((n: any) => n.id === edge.source) && c.path.some((n: any) => n.id === edge.target));
+      
+      const targetNode = uniqueAssetsList.find((n: any) => n.id === edge.target);
+      const strokeColor = isSelectedChain 
+        ? (targetNode?.severity === "critical" ? "#ef4444" : "#f59e0b") 
+        : "#4a5a80";
+      
+      let edgeOpacity = 0.8;
+      if (targetNodeId) {
+        edgeOpacity = (edge.source === targetNodeId || edge.target === targetNodeId) ? 1.0 : 0.15;
+      } else if (activeChain) {
+        edgeOpacity = isSelectedChain ? 1.0 : 0.15;
+      }
+
+      return {
+        id: `edge-${edge.source}-${edge.target}`,
+        source: edge.source,
+        target: edge.target,
+        animated: activeChain ? isSelectedChain : false,
+        style: { 
+          stroke: strokeColor, 
+          strokeWidth: isSelectedChain ? 2.5 : 1.5,
+          opacity: edgeOpacity
+        },
+        markerEnd: { 
+          type: MarkerType.ArrowClosed, 
+          color: strokeColor,
+          width: 16,
+          height: 16
+        },
+        data: {
+          reason: edge.reason,
+          rule: edge.rule,
+          cves: edge.cves || [],
+          findings: edge.findings || []
+        }
+      };
+    });
+
+    let active = true;
+    elkLayout(rawNodes, edges).then((layoutedNodes) => {
+      if (active) {
+        setRfNodes(layoutedNodes);
+        setRfEdges(edges);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [chains, backendEdges, selectedChainId, selectedNodeId, uniqueAssetsList, responseData, setRfNodes, setRfEdges]);
+
+  // Aggregate selected threat vector details for inspector panel
+  const selectedChain = useMemo(() => {
+    if (!chains || !Array.isArray(chains) || chains.length === 0) return null;
+    
+    if (selectedChainId === "all") {
+      const allMitre = new Set<string>();
+      const allRemediations = new Set<string>();
+      
+      chains.forEach((c: any) => {
+        c.mitreTechniques?.forEach((t: string) => allMitre.add(t));
+        c.remediations?.forEach((r: string) => allRemediations.add(r));
+      });
+
+      return {
+        id: "all",
+        patternName: "All Threat Vectors",
+        severity: "High",
+        likelihood: "High",
+        businessImpact: "Critical",
+        description: "Composite visual map containing all dynamically inferred attack paths and vulnerability dependencies across live assets.",
+        mitreTechniques: Array.from(allMitre),
+        path: uniqueAssetsList.filter((a: any) => a.isInAttackChain).map((a: any) => ({ assetName: a.assetName })),
+        remediations: Array.from(allRemediations).slice(0, 5)
+      };
+    }
+
+    return chains.find((c: any) => c.id === selectedChainId) || chains[0];
+  }, [chains, selectedChainId, uniqueAssetsList]);
+
+  const handleNodeClick = (nodeId: string) => {
+    setSelectedNodeId((prev) => (prev === nodeId ? "all" : nodeId));
+    // Auto-select first matching chain containing the node to align details
+    if (chains && selectedNodeId !== nodeId) {
+      const matched = chains.find((c: any) => c.path.some((n: any) => n.id === nodeId));
+      if (matched) {
+        setSelectedChainId(matched.id);
+      }
+    }
+    setSelectedEdge(null);
+  };
+
+  const handleEdgeClick = (edge: any) => {
+    if (devMode) {
+      setSelectedEdge(edge);
+    }
+  };
 
   const handleTriggerPlaybook = (mitigation: string) => {
     toast.success(`Action successfully initialized: "${mitigation}"`);
   };
 
-  if (isLoading || !graphData) {
+  // Metric Computations
+  const threatStagesVal = useMemo(() => {
+    const total = chains?.length || 0;
+    return `${total} detected vector${total === 1 ? "" : "s"}`;
+  }, [chains]);
+
+  const criticalNodesVal = useMemo(() => {
+    const criticalCount = uniqueAssetsList.filter((a: any) => a.severity.toLowerCase() === "critical").length;
+    return `${criticalCount} critical node${criticalCount === 1 ? "" : "s"}`;
+  }, [uniqueAssetsList]);
+
+  const containmentReadinessVal = useMemo(() => {
+    if (!incidentsData || incidentsData.length === 0) return "100% prepared";
+    const total = incidentsData.length;
+    const mitigated = incidentsData.filter((i: any) => i.status === "resolved" || i.status === "suppressed" || i.status === "mitigated").length;
+    const percentage = Math.round((mitigated / total) * 100);
+    return `${percentage}% prepared`;
+  }, [incidentsData]);
+
+  if (isLoading || !responseData) {
     return (
       <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] justify-center items-center font-mono">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyber-primary" />
@@ -175,19 +517,28 @@ export function AttackGraphPage() {
     );
   }
 
-  if (!selectedNode) {
-    return null;
+  if (chains.length === 0) {
+    return (
+      <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] justify-center items-center font-mono text-center">
+        <p className="text-sm text-slate-400 font-sans">No attack paths detected in the network.</p>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mt-2 text-xs">
+          Return to Dashboard
+        </Button>
+      </div>
+    );
   }
 
+  if (!selectedChain) return null;
+
   return (
-    <div className="space-y-6 flex flex-col h-[calc(100vh-100px)]">
-      {/* Page Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-4 shrink-0">
+    <div className="space-y-5 flex flex-col h-[calc(100vh-100px)] overflow-hidden">
+      {/* Header */}
+      <div className="flex justify-between items-center border-b border-slate-200 pb-3 shrink-0 dark:border-slate-800">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans dark:text-slate-100">
             Attack Path Analyst
           </h1>
-          <p className="text-xs text-brand-secondary mt-1 font-sans">
+          <p className="text-xs text-slate-500 mt-0.5 font-sans dark:text-slate-400">
             Visual attack path analysis mapping credential compromise, privilege escalation, and lateral containment gates.
           </p>
         </div>
@@ -198,127 +549,227 @@ export function AttackGraphPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Threat stages</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">5 chained vectors</p>
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Threat vectors</p>
+          <p className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-slate-100">{threatStagesVal}</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Critical nodes</p>
-          <p className="mt-1 text-lg font-semibold text-cyber-critical">3 elevated paths</p>
+          <p className="mt-0.5 text-lg font-semibold text-cyber-critical">{criticalNodesVal}</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Containment readiness</p>
-          <p className="mt-1 text-lg font-semibold text-cyber-low">92% prepared</p>
+          <p className="mt-0.5 text-lg font-semibold text-cyber-low">{containmentReadinessVal}</p>
         </div>
       </div>
 
-      {/* Split visualizer grids */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-1 min-h-0 items-stretch">
+
+      {/* Primary Split container */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 flex-1 min-h-0 items-stretch">
         
-        {/* React Flow Visualizer (3/4 width) */}
-        <div className="xl:col-span-3 border border-slate-200 bg-white rounded-lg relative overflow-hidden flex flex-col min-h-[400px] shadow-card">
-          {/* Subtle grid background overlay */}
-          <div className="absolute inset-0 cyber-grid-overlay opacity-5 pointer-events-none z-0" />
-          
-          <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-white/80 border border-slate-200 p-2 rounded shadow-sm select-none backdrop-blur-sm">
+        {/* Visualizer Canvas Area (75% width) */}
+        <div className="xl:col-span-9 border border-slate-200 bg-slate-950 rounded-xl relative overflow-hidden flex flex-col min-h-[450px] shadow-card dark:border-slate-850">
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-slate-900 border border-slate-800 p-2 rounded-lg shadow-md select-none">
             <Flame className="h-4 w-4 text-cyber-critical animate-pulse" />
-            <span className="text-[10px] font-mono font-bold text-slate-800 uppercase tracking-wider">LIVE PROPAGATION CHAIN</span>
+            <span className="text-[10px] font-mono font-bold text-slate-100 uppercase tracking-wider">LIVE PROPAGATION CANVAS</span>
           </div>
 
-          {/* Interactive React Flow area */}
-          <div className="flex-1 min-h-0 relative z-10 font-sans">
-            <ReactFlow
-              nodes={rfNodes}
-              edges={rfEdges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              nodeTypes={nodeTypes}
-              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-              fitView
-              zoomOnScroll
-              zoomOnPinch
-              panOnDrag
-              attributionPosition="bottom-left"
+          {/* Selector dropdown */}
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-slate-900 border border-slate-800 p-1.5 px-3 rounded-lg shadow-md select-none">
+            <Sparkles className="h-3.5 w-3.5 text-blue-400" />
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Vector:</span>
+            <select
+              value={selectedChainId}
+              onChange={(e) => {
+                setSelectedChainId(e.target.value);
+                setSelectedNodeId("all");
+                setSelectedEdge(null);
+              }}
+              className="text-[10px] font-sans bg-transparent border-none outline-none font-semibold text-slate-100 cursor-pointer focus:ring-0"
             >
-              <Background color="#cbd5e1" gap={20} size={1} />
-              <Controls className="bg-white border border-slate-200 text-slate-500 rounded-md shadow-sm [&_button]:border-slate-100 [&_button]:bg-white [&_button]:text-slate-500 [&_button:hover]:bg-slate-50" />
-              <MiniMap 
-                nodeColor={(node) => {
-                  const data = node.data as AttackNodeData;
-                  if (data?.severity === "critical") return "#ef4444";
-                  if (data?.severity === "high") return "#f59e0b";
-                  return "#2563eb";
-                }}
-                maskColor="rgba(248, 250, 252, 0.7)"
-                style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 6 }}
-                className="border-slate-200"
-              />
-            </ReactFlow>
+              <option value="all" className="bg-slate-900 text-slate-100">Show All Threat Vectors</option>
+              {chains.map((c: any) => (
+                <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100">
+                  {c.patternName} ({c.severity})
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        {/* Floating Mitigation Console (1/4 width) */}
-        <div className="xl:col-span-1 flex flex-col justify-between border border-slate-200 bg-white rounded-lg p-4.5 relative overflow-y-auto shadow-card">
-          {/* Top border color matching selected node severity */}
+          <div className="flex-1 min-h-0 relative">
+            <ReactFlowProvider>
+              <AttackGraphCanvas
+                rfNodes={rfNodes}
+                rfEdges={rfEdges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                nodeTypes={nodeTypes}
+                handleNodeClick={handleNodeClick}
+                handleEdgeClick={handleEdgeClick}
+              />
+            </ReactFlowProvider>
+          </div>
+
+          {/* Developer Debug Edge Inspector floating box */}
+          {devMode && selectedEdge && (
+            <div className="absolute bottom-4 left-4 z-20 bg-slate-900 border border-slate-850 p-4 rounded-xl shadow-premium text-xs text-slate-300 md:w-[380px] select-none text-left">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <span className="font-mono font-bold text-blue-400 uppercase tracking-wider text-[9.5px]">Edge Justification Analysis</span>
+                <button 
+                  onClick={() => setSelectedEdge(null)} 
+                  className="text-slate-500 hover:text-slate-200 text-base font-bold leading-none cursor-pointer"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="space-y-2 font-sans">
+                <p>
+                  <strong className="text-slate-450 font-mono text-[9px] uppercase tracking-wider block">Source Node:</strong> 
+                  <span className="text-slate-100 font-semibold">{rfNodes.find(n => n.id === selectedEdge.source)?.data.label || selectedEdge.source}</span>
+                </p>
+                <p>
+                  <strong className="text-slate-450 font-mono text-[9px] uppercase tracking-wider block">Destination Node:</strong> 
+                  <span className="text-slate-100 font-semibold">{rfNodes.find(n => n.id === selectedEdge.target)?.data.label || selectedEdge.target}</span>
+                </p>
+                <p>
+                  <strong className="text-slate-455 font-mono text-[9px] uppercase tracking-wider block">Inference Rule Used:</strong> 
+                  <span className="text-blue-300 font-semibold">{selectedEdge.data?.rule || "Generic Lateral Pivot"}</span>
+                </p>
+                <p>
+                  <strong className="text-slate-455 font-mono text-[9px] uppercase tracking-wider block">Evidence Reason:</strong> 
+                  <span className="text-slate-250 leading-relaxed block bg-slate-950/40 p-2 border border-slate-850 rounded-md mt-0.5 break-words">
+                    {selectedEdge.data?.reason}
+                  </span>
+                </p>
+                
+                {selectedEdge.data?.cves && selectedEdge.data.cves.length > 0 && (
+                  <div className="pt-1">
+                    <strong className="text-slate-450 font-mono text-[9px] uppercase tracking-wider block mb-1">CVEs Involved:</strong>
+                    <div className="flex flex-wrap gap-1 max-h-14 overflow-y-auto">
+                      {selectedEdge.data.cves.map((cve: string, idx: number) => (
+                        <span key={idx} className="text-[8.5px] font-mono bg-red-950/40 text-red-300 border border-red-900/30 px-1.5 py-0.5 rounded">
+                          {cve}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>        {/* Dynamic Inspector Panel (25% width, scrolling enabled, overflow safe) */}
+        <div className="xl:col-span-3 flex flex-col justify-between border border-slate-200 bg-slate-905 rounded-xl p-4.5 relative overflow-hidden h-full shadow-card dark:border-slate-800 dark:bg-slate-950 w-full min-w-0">
           <div className={cn(
-            "absolute top-0 left-0 right-0 h-[1.5px]",
-            selectedNode.severity === "critical" && "bg-cyber-critical",
-            selectedNode.severity === "high" && "bg-cyber-high"
+            "absolute top-0 left-0 right-0 h-[2px]",
+            selectedChain.severity.toLowerCase() === "critical" ? "bg-cyber-critical" : "bg-cyber-high"
           )} />
 
-          <div className="space-y-4">
-            {/* Header Section */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 block">Threat Stage Inspector</span>
-              <h3 className="text-sm font-bold font-sans text-slate-800 mt-1 leading-tight">{selectedNode.label}</h3>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge severity={selectedNode.severity}>{selectedNode.severity}</Badge>
-                <span className="font-mono text-[9px] text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded truncate max-w-[130px]">
-                  {selectedNode.ip}
+          <div className="flex-1 overflow-y-auto pr-1 space-y-5 max-h-[calc(100vh-180px)] w-full min-w-0">
+            {/* Header info */}
+            <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 w-full">
+              <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 block font-semibold">Stage Inspector</span>
+              <h3 className="text-[13px] font-bold font-sans text-slate-800 dark:text-slate-100 mt-1 leading-snug break-words whitespace-normal w-full">
+                {selectedChain.patternName}
+              </h3>
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
+                <Badge severity={selectedChain.severity.toLowerCase() as any}>{selectedChain.severity}</Badge>
+                {selectedChain.likelihood && (
+                  <span className="font-mono text-[8.5px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded dark:bg-slate-950 dark:border-slate-800 dark:text-slate-405">
+                    Likelihood: {selectedChain.likelihood}
+                  </span>
+                )}
+                {selectedChain.businessImpact && (
+                  <span className="font-mono text-[8.5px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded dark:bg-slate-950 dark:border-slate-800 dark:text-slate-405">
+                    Impact: {selectedChain.businessImpact}
+                  </span>
+                )}
+                <span className="font-mono text-[8.5px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded dark:bg-slate-950 dark:border-slate-800 dark:text-slate-405">
+                  Risk Score: {(selectedChain.severity.toLowerCase() === "critical" ? 9.5 : selectedChain.severity.toLowerCase() === "high" ? 8.8 : selectedChain.severity.toLowerCase() === "medium" ? 6.5 : 3.2).toFixed(1)}
                 </span>
               </div>
             </div>
 
             {/* Description */}
-            <div className="font-sans text-[11px] text-slate-600 bg-slate-50 border border-slate-200 p-3 rounded-md leading-relaxed">
-              {selectedNode.description}
-            </div>
-
-            {/* Mitigations Playbook list */}
-            <div className="space-y-2.5">
-              <h4 className="text-[9px] font-mono font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
-                <CornerDownRight className="h-3.5 w-3.5 text-cyber-primary" /> Recommended Playbooks
-              </h4>
-              
-              <div className="space-y-2">
-                {selectedNode.mitigations.map((mit: string, idx: number) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleTriggerPlaybook(mit)}
-                    className="w-full text-left p-2.5 bg-slate-50/50 border border-slate-200 hover:border-brand-accent/40 rounded-md text-[10px] font-mono text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center justify-between transition-all cursor-pointer group shadow-sm"
-                  >
-                    <span className="truncate max-w-[170px]">{mit}</span>
-                    <Sparkles className="h-3 w-3 text-slate-450 group-hover:text-brand-accent transition-colors" />
-                  </button>
-                ))}
+            {selectedChain.description && (
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-1.5 w-full">
+                <strong className="text-slate-700 dark:text-slate-350 block font-mono text-[9px] uppercase">Path Description</strong>
+                <p className="font-sans text-[11.5px] text-slate-600 dark:text-slate-400 break-words whitespace-normal w-full leading-relaxed">
+                  {selectedChain.description}
+                </p>
               </div>
-            </div>
+            )}
+
+            {/* MITRE Techniques */}
+            {selectedChain.mitreTechniques && selectedChain.mitreTechniques.length > 0 && (
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-2 w-full">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-slate-455 block font-bold dark:text-slate-400">MITRE Techniques</span>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto w-full pr-1">
+                  {selectedChain.mitreTechniques.map((tech: string, idx: number) => {
+                    const code = tech.split(" - ")[0];
+                    return (
+                      <span key={idx} className="text-[9px] font-mono bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded dark:bg-slate-950 dark:border-slate-800 dark:text-slate-350 break-all max-w-full" title={tech}>
+                        {code}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Assets Involved */}
+            {selectedChain.path && selectedChain.path.length > 0 && (
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-2 w-full">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-slate-455 block font-bold dark:text-slate-400">Assets Involved</span>
+                <div className="flex flex-col items-center bg-white border border-slate-200 p-2.5 rounded-lg dark:bg-slate-950 dark:border-slate-800 gap-1 text-[9.5px] font-mono text-slate-650 dark:text-slate-350 select-none max-h-40 overflow-y-auto w-full pr-1">
+                  {selectedChain.path.map((node: any, idx: number) => (
+                    <React.Fragment key={idx}>
+                      {idx > 0 && <span className="text-slate-400 font-bold shrink-0">↓</span>}
+                      <span className="text-slate-800 font-bold dark:text-slate-200 break-all whitespace-normal text-center max-w-full">{node.assetName}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recommendations */}
+            {selectedChain.remediations && selectedChain.remediations.length > 0 && (
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-2.5 w-full">
+                <h4 className="text-[9px] font-mono font-bold tracking-wider text-slate-455 uppercase flex items-center gap-1.5 dark:text-slate-400">
+                  <CornerDownRight className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Recommended Mitigations
+                </h4>
+                
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 w-full">
+                  {selectedChain.remediations.map((mit: string, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleTriggerPlaybook(mit)}
+                      className="w-full text-left p-2.5 bg-white border border-slate-200 hover:border-blue-500/45 rounded-lg text-[9.5px] font-mono text-slate-650 hover:text-slate-900 hover:bg-slate-950 flex items-center justify-between transition-all cursor-pointer group shadow-sm dark:bg-slate-950 dark:border-slate-800 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-900 min-w-0"
+                    >
+                      <span className="whitespace-normal break-words pr-2 leading-relaxed min-w-0 flex-1">{mit}</span>
+                      <Sparkles className="h-3 w-3 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Footer Triage action */}
-          <div className="pt-4 border-t border-slate-100 mt-4 shrink-0">
+          {/* Action button */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-850 shrink-0 mt-3">
             <Button
               variant="cyber"
               size="sm"
               className="w-full text-xs font-mono justify-center"
-              onClick={() => navigate(`/copilot?query=mitigate+${selectedNodeId}`)}
+              onClick={() => navigate(`/copilot?query=mitigate+${selectedChain.id}`)}
             >
               <Compass className="mr-1.5 h-3.5 w-3.5" />
               DEPLOY MITIGATION WIZARD
             </Button>
           </div>
         </div>
+
       </div>
     </div>
   );
