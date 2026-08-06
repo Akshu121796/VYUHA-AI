@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: vyuha-backend
+    env: node
+    plan: free
+    buildCommand: npm install && (pip3 install -r requirements.txt || pip install -r requirements.txt || echo "pip install skipped") && npm run build --prefix backend
+    startCommand: npm run start --prefix backend
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

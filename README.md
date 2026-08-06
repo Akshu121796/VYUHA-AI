@@ -203,6 +203,40 @@ This starts:
 | Paras Kumbhkar | AI/ML |
 
 
+# 🚀 Production Deployment
+
+## Deployed Services
+- **Frontend App**: https://vyuha-ai-virid.vercel.app
+- **Backend Service**: https://vyuha-backend.onrender.com (or your configured Render URL)
+
+## Backend Deployment (Render)
+1. **New Web Service**: Connect your GitHub repository to a new Render web service.
+2. **Environment**: Select `Node` environment.
+3. **Build Command**: 
+   ```bash
+   npm install && (pip3 install -r requirements.txt || pip install -r requirements.txt || echo "pip install skipped") && npm run build --prefix backend
+   ```
+4. **Start Command**:
+   ```bash
+   npm run start --prefix backend
+   ```
+5. **Environment Variables**:
+   - `PORT`: `8000`
+   - `SUPABASE_URL`: Your Supabase Project URL
+   - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key
+   - `SUPABASE_JWT_SECRET`: Your Supabase JWT secret
+   - `GROQ_API_KEY`: Your Groq API key
+   - `NVD_API_KEY`: *(Optional)* Your NVD developer API key
+
+## Frontend Deployment (Vercel)
+1. **New Project**: Import the repository in Vercel.
+2. **Root Directory**: Set to `frontend` or build from root.
+3. **Build Command**: `npm run build` (if root directory is `frontend`)
+4. **Environment Variables**:
+   - `VITE_API_URL`: Your deployed Render backend URL (e.g. `https://vyuha-backend.onrender.com`)
+
+---
+
 #  License
 This project is licensed under the **MIT License**.
 
