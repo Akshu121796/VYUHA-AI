@@ -47,6 +47,9 @@ export function SettingsPage() {
   const [profileName, setProfileName] = useState(user?.username || "Kaveesh");
   const [profileEmail, setProfileEmail] = useState("kaveesh@vyuha.ai");
   const [profileTitle, setProfileTitle] = useState("Senior SOC Analyst");
+  const [backendUrl, setBackendUrl] = useState(() => {
+    return localStorage.getItem("VYUHA_API_URL") || "";
+  });
 
   // Theme states
   const [themeContrast, setThemeContrast] = useState<"standard" | "high">("standard");
@@ -99,6 +102,9 @@ export function SettingsPage() {
   }
 
   const handleSaveSettings = (section: string) => {
+    if (section === "Profile") {
+      localStorage.setItem("VYUHA_API_URL", backendUrl);
+    }
     updateSettings.mutate({
       profile: { name: profileName, email: profileEmail, title: profileTitle },
       theme: { contrast: themeContrast },
@@ -288,6 +294,10 @@ export function SettingsPage() {
                   <div className="space-y-1 md:col-span-2">
                     <span className="text-[10px] font-mono uppercase text-slate-450 block font-semibold">SOC Title</span>
                     <Input value={profileTitle} onChange={(e) => setProfileTitle(e.target.value)} className="text-xs font-mono border-slate-200 bg-slate-50/50" />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <span className="text-[10px] font-mono uppercase text-slate-450 block font-semibold">Backend Connection URL (Optional Override)</span>
+                    <Input value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} placeholder="https://vyuha-backend.onrender.com" className="text-xs font-mono border-slate-200 bg-slate-50/50" />
                   </div>
                 </div>
                 <div className="pt-3 border-t border-slate-100 flex justify-end">
