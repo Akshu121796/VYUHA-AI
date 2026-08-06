@@ -1,0 +1,43 @@
+<report>
+  <results>
+    <result>
+      <host hostname="test-endpoint-01">192.168.1.10</host>
+      <port>22/tcp</port>
+      <nvt oid="1.3.6.1.4.1.25623.1.0.108581">
+        <name>OpenSSH Detection</name>
+        <cvss_base>0.0</cvss_base>
+        <cve>NOCVE</cve>
+        <family>General</family>
+      </nvt>
+      <threat>Log</threat>
+      <severity>0.0</severity>
+      <description>OpenSSH 7.4 detected on port 22/tcp.</description>
+    </result>
+    <result>
+      <host hostname="test-endpoint-01">192.168.1.10</host>
+      <port>443/tcp</port>
+      <nvt oid="1.3.6.1.4.1.25623.1.0.150001">
+        <name>Apache HTTP Server Multiple Vulnerabilities</name>
+        <cvss_base>9.8</cvss_base>
+        <cve>CVE-2021-41773, CVE-2021-42013</cve>
+        <family>Web application abuses</family>
+      </nvt>
+      <threat>Critical</threat>
+      <severity>9.8</severity>
+      <description>The remote host is running Apache httpd 2.4.49 which is affected by a path traversal vulnerability.</description>
+    </result>
+    <result>
+      <host hostname="test-endpoint-01">192.168.1.10</host>
+      <port>3306/tcp</port>
+      <nvt oid="1.3.6.1.4.1.25623.1.0.150002">
+        <name>Weak Password Authentication Method</name>
+        <cvss_base>7.5</cvss_base>
+        <cve></cve>
+        <family>Authentication</family>
+      </nvt>
+      <threat>High</threat>
+      <severity>7.5</severity>
+      <description>The MySQL service allows weak/default password authentication.</description>
+    </result>
+  </results>
+</report>
