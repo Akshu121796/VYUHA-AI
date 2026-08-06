@@ -19,6 +19,7 @@ const SettingsPage = lazy(() => import("./pages/Settings/SettingsPage").then(m =
 const EndpointsPage = lazy(() => import("./pages/Endpoints/EndpointsPage").then(m => ({ default: m.EndpointsPage })));
 const NotFoundPage = lazy(() => import("./pages/NotFound/NotFoundPage").then(m => ({ default: m.NotFoundPage })));
 const MaintenancePage = lazy(() => import("./pages/Maintenance/MaintenancePage").then(m => ({ default: m.MaintenancePage })));
+const ScanImportPage = lazy(() => import("./pages/ScanImport/ScanImportPage").then(m => ({ default: m.ScanImportPage })));
 
 import { motion } from "framer-motion";
 
@@ -61,6 +62,7 @@ export function App() {
               <Route path="/approvals" element={<ApprovalQueuePage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/scan-import" element={<ScanImportPage />} />
             </Route>
 
             {/* Maintenance route */}

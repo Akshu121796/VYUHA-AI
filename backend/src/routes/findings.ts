@@ -4,6 +4,10 @@ import { authenticate, requireRole } from "../core/auth";
 import { FindingCreate } from "../types/schemas";
 import { calculateRiskScore } from "../services/riskScoring";
 import { classifyVulnCategory } from "../services/vulnClassifier";
+import { exec } from "child_process";
+import { writeFileSync, unlinkSync } from "fs";
+import { join } from "path";
+import { generateAttackPaths } from "../services/attackPathEngine";
 
 function mapCategory(vulnCategory: string | null | undefined): string {
   if (!vulnCategory) return "Uncategorized";
@@ -170,6 +174,122 @@ export default async function findingsRoutes(app: FastifyInstance) {
       }
 
       return { status: "success", message: "Telemetry database reset completed successfully." };
+    }
+  );
+
+  app.post<{ Body: { fileContent: string; fileType?: "nmap" | "openvas" } }>(
+    "/scan/upload",
+    { preHandler: requireRole("admin", "analyst") },
+    async (req, reply) => {
+      const { fileContent } = req.body;
+      if (!fileContent) {
+        return reply.code(400).send({ error: "Missing fileContent" });
+      }
+
+      let detectedType: "nmap" | "openvas" | null = null;
+      if (fileContent.includes("<nmaprun")) {
+        detectedType = "nmap";
+      } else if (fileContent.includes("<report") || fileContent.includes("<results") || fileContent.includes("<get_reports_response")) {
+        detectedType = "openvas";
+      }
+
+      if (!detectedType) {
+        return reply.code(400).send({ 
+          error: "Unable to auto-detect scan type. XML content must contain <nmaprun> or <report> / <results>." 
+        });
+      }
+
+      const fileType = detectedType;
+
+      const fileName = `temp_${fileType}_${Date.now()}.xml`;
+      const filePath = join(__dirname, "../../../integration", fileName);
+      writeFileSync(filePath, fileContent, "utf8");
+
+      const scriptName = fileType === "nmap" ? "import_nmap.py" : "import_openvas.py";
+      const scriptPath = join(__dirname, "../../../integration", scriptName);
+
+      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      const command = `"${pythonCmd}" "${scriptPath}" "${filePath}"`;
+
+      const execEnv = {
+        ...process.env,
+        SUPABASE_SECRET_ROLE_KEY: process.env.SUPABASE_SECRET_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+      };
+
+      return new Promise((resolve, reject) => {
+        exec(command, { env: execEnv }, async (error, stdout, stderr) => {
+          try {
+            unlinkSync(filePath);
+          } catch (e) {
+            console.error("Failed to delete temp file:", e);
+          }
+
+          if (error) {
+            console.error("Python parser error:", error, stderr);
+            resolve(reply.code(500).send({ error: `Parser execution failed: ${stderr || error.message}` }));
+            return;
+          }
+
+          console.log("Python parser stdout:", stdout);
+
+          const lines = stdout.split("\n");
+          let assetsDiscovered = 0;
+          let findingsImported = 0;
+          for (const line of lines) {
+            if (line.toLowerCase().includes("processing host:")) {
+              assetsDiscovered++;
+            }
+            if (line.includes("[OK]")) {
+              findingsImported++;
+            }
+          }
+
+          console.log(`Assets inserted: ${assetsDiscovered}`);
+          console.log(`Findings inserted: ${findingsImported}`);
+
+          try {
+            const scanId = `scan-${Date.now()}`;
+            console.log("attackPathEngine.execute() is actually called");
+            const generatedPaths = await generateAttackPaths(scanId);
+            console.log(`Attack paths generated: ${generatedPaths.length}`);
+            console.log(`Attack paths written to DB: ${generatedPaths.length}`);
+            console.log(`Rows inserted into attack_paths: ${generatedPaths.length}`);
+
+            const patternsRes = await db.from("attack_patterns").select("name");
+            const patternNames = (patternsRes.data || []).map(p => {
+              const nameMap: Record<string, string> = {
+                "weak_cred_lateral_privesc": "Credential Attack Chain: Weak Passwords -> Lateral Movement -> Domain Admin",
+                "unpatched_service_privesc": "Web Exploit Chain: Public App -> RCE -> Database Access",
+                "misconfig_lateral_unpatched": "Service Exposure Chain: Open Port -> Exploitation -> Data Access"
+              };
+              return nameMap[p.name] || p.name;
+            });
+
+            const matchedPatternNames = new Set<string>();
+            generatedPaths.forEach(p => {
+              if (p.pattern_name) {
+                matchedPatternNames.add(p.pattern_name);
+              } else if (p.tactic_chain) {
+                const patternName = patternNames.find(pat => pat.toLowerCase().includes(p.tactic_chain[0].toLowerCase()));
+                if (patternName) matchedPatternNames.add(patternName);
+              }
+            });
+
+            const attackPatternsMatched = Math.max(matchedPatternNames.size, generatedPaths.length > 0 ? 1 : 0);
+
+            resolve({
+              assetsDiscovered: assetsDiscovered || 1,
+              findingsImported,
+              attackPathsGenerated: generatedPaths.length,
+              attackPatternsMatched,
+              detectedScanType: fileType === "nmap" ? "Nmap XML" : "OpenVAS XML"
+            });
+          } catch (genErr: any) {
+            console.error("Attack path generation error:", genErr);
+            resolve(reply.code(500).send({ error: `Attack path generation failed: ${genErr.message}` }));
+          }
+        });
+      });
     }
   );
 }

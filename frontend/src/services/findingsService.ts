@@ -13,6 +13,10 @@ export const findingsService = {
   resetTelemetry: async () => {
     const res = await apiClient.post("/findings/reset");
     return res.data;
+  },
+  uploadScan: async (fileContent: string, fileType?: "nmap" | "openvas") => {
+    const res = await apiClient.post("/scan/upload", { fileContent, fileType });
+    return res.data;
   }
 };
 export default findingsService;

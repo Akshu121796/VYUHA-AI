@@ -15,6 +15,7 @@ import {
   UserCheck,
   Server,
   Network,
+  FileUp,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useIncidentsData, useApprovalsData } from "../hooks/queries/useVyuhaQueries";
@@ -46,6 +47,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse, onNavigate }: SidebarPr
       badgeColor: "border-red-200 bg-red-50 text-cyber-critical",
     },
     { path: "/endpoints", name: "Endpoints", icon: <Server className="h-4 w-4" /> },
+    { path: "/scan-import", name: "Scan Import", icon: <FileUp className="h-4 w-4" /> },
     { path: "/graph", name: "Attack Paths", icon: <Network className="h-4 w-4" /> },
     { path: "/copilot", name: "AI Copilot", icon: <MessageSquareCode className="h-4 w-4" /> },
     {

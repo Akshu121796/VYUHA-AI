@@ -157,6 +157,12 @@ export function normalizeFindingType(cat: string | null | undefined): string[] {
   if (c === "weak_credential") {
     return ["weak_credential"];
   }
+  if (c === "outdated_database") {
+    return ["database_exposure", "outdated_software"];
+  }
+  if (c === "weak_service") {
+    return ["insecure_service", "exposed_service"];
+  }
   
   return [c];
 }
@@ -445,8 +451,141 @@ export function generateAttackPathContext(chains: any[], vulnNodes: any, finding
 }
 
 // Backwards compatibility function
+import { randomUUID } from "crypto";
+
 export async function generateAttackPaths(scanId: string) {
-  return [];
+  console.log("Generating attack paths...");
+  // 1. Fetch assets and findings
+  const assetsRes = await db.from("assets").select("*");
+  const findingsRes = await db.from("findings").select("*").eq("status", "open");
+  if (assetsRes.error || findingsRes.error) {
+    console.error("Failed to fetch assets/findings for attack path engine");
+    return [];
+  }
+
+  const assets = assetsRes.data || [];
+  const findings = findingsRes.data || [];
+
+  // 2. Infer edges
+  const edges = inferEdgesFromScanData(assets, findings);
+
+  // 3. Find paths
+  const rawPaths = findChainsFromEdges(edges, assets); // returns string[][] (arrays of asset IDs)
+
+  const candidatePaths: any[] = [];
+
+  // 4. Build new attack paths in memory first
+  for (const pathAssetIds of rawPaths) {
+    // Avoid short paths
+    if (pathAssetIds.length < 2) continue;
+
+    const pathNodes: any[] = [];
+    let hasFindingsForAll = true;
+
+    for (let i = 0; i < pathAssetIds.length; i++) {
+      const assetId = pathAssetIds[i];
+      const asset = assetId === "internet-node"
+        ? { id: "internet-node", hostname: "Internet", ip_address: "0.0.0.0", os_type: "External", criticality: "low" }
+        : assets.find(a => a.id === assetId);
+      if (!asset) {
+        hasFindingsForAll = false;
+        break;
+      }
+
+      const assetFindings = findings.filter(f => f.asset_id === assetId);
+      if (assetFindings.length === 0) {
+        pathNodes.push({
+          step: i + 1,
+          cve_id: null,
+          tactic: i === 0 ? "Initial Access" : i === 1 ? "Execution" : i === 2 ? "Lateral Movement" : "Privilege Escalation",
+          asset_id: assetId,
+          hostname: asset.hostname,
+          finding_id: "none",
+          vuln_category: "network_exposure"
+        });
+        continue;
+      }
+
+      // Select highest risk finding on the asset
+      const highestFinding = [...assetFindings].sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0))[0];
+
+      let tactic = "Initial Access";
+      if (i === 1) tactic = "Execution";
+      else if (i === 2) tactic = "Lateral Movement";
+      else if (i >= 3) tactic = "Privilege Escalation";
+
+      if (highestFinding.vuln_category === "weak_credential") tactic = "Credential Access";
+      else if (highestFinding.vuln_category === "privilege_escalation_vuln") tactic = "Privilege Escalation";
+      else if (highestFinding.vuln_category === "lateral_movement_vector") tactic = "Lateral Movement";
+      else if (highestFinding.vuln_category === "misconfiguration") tactic = "Defense Evasion";
+      else if (highestFinding.vuln_category === "outdated_database") tactic = "Database Access";
+      else if (highestFinding.vuln_category === "weak_service") tactic = "Initial Access";
+
+      pathNodes.push({
+        step: i + 1,
+        cve_id: highestFinding.cve_id,
+        tactic,
+        asset_id: assetId,
+        hostname: asset.hostname,
+        finding_id: highestFinding.id,
+        vuln_category: highestFinding.vuln_category
+      });
+    }
+
+    if (!hasFindingsForAll) continue;
+
+    const pathFindings = findings.filter(f => pathAssetIds.includes(f.asset_id));
+    const maxRiskScore = pathFindings.length > 0 ? Math.max(...pathFindings.map(f => f.risk_score || 0)) : 5.0;
+
+    const entryAsset = pathAssetIds[0] === "internet-node"
+      ? { id: "internet-node", hostname: "Internet" }
+      : assets.find(a => a.id === pathAssetIds[0]);
+    const targetAsset = assets.find(a => a.id === pathAssetIds[pathAssetIds.length - 1]);
+
+    const newPath = {
+      id: randomUUID(),
+      scan_id: scanId || `scan-${Date.now()}`,
+      entry_point: entryAsset ? entryAsset.hostname : "unknown",
+      target_asset: targetAsset ? targetAsset.hostname : "unknown",
+      risk_score: maxRiskScore,
+      tactic_chain: pathNodes.map(n => n.tactic),
+      created_at: new Date().toISOString(),
+      path_nodes: pathNodes
+    };
+    candidatePaths.push(newPath);
+  }
+
+  if (candidatePaths.length === 0) {
+    console.log("No new attack paths generated. Preserving last valid attack graph.");
+    const existingRes = await db.from("attack_paths").select("*");
+    return existingRes.data || [];
+  }
+
+  // 5. Delete old attack paths and insert new ones
+  await db.from("attack_paths").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+  const generatedPaths: any[] = [];
+  // Sort candidate paths by risk score descending, length descending, and take top 6
+  const finalCandidates = candidatePaths
+    .sort((a, b) => {
+      if (b.risk_score !== a.risk_score) {
+        return b.risk_score - a.risk_score;
+      }
+      return b.path_nodes.length - a.path_nodes.length;
+    })
+    .slice(0, 6);
+
+  for (const newPath of finalCandidates) {
+    const { data, error } = await db.from("attack_paths").insert(newPath).select().single();
+    if (!error && data) {
+      generatedPaths.push(data);
+    } else if (error) {
+      console.error("Error inserting attack path:", error.message);
+    }
+  }
+
+  console.log(`Successfully generated ${generatedPaths.length} attack paths.`);
+  return generatedPaths;
 }
 
 export interface InferredEdge {
@@ -639,6 +778,21 @@ Evidence Used: ${edge.reason}
   return edges;
 }
 
+function isSubarray(sub: string[], main: string[]): boolean {
+  if (sub.length > main.length) return false;
+  for (let i = 0; i <= main.length - sub.length; i++) {
+    let match = true;
+    for (let j = 0; j < sub.length; j++) {
+      if (main[i + j] !== sub[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return true;
+  }
+  return false;
+}
+
 export function findChainsFromEdges(edges: InferredEdge[], assets: any[]): any[] {
   const adj = new Map<string, string[]>();
   edges.forEach(e => {
@@ -660,23 +814,22 @@ export function findChainsFromEdges(edges: InferredEdge[], assets: any[]): any[]
   const starts = Array.from(allNodeIds).filter(id => !incoming.has(id));
 
   const dfs = (curr: string, path: string[]) => {
-    if (path.length > 4) {
+    if (path.length >= 6) {
       paths.push([...path]);
       return;
     }
     const nexts = adj.get(curr) || [];
-    if (nexts.length === 0) {
-      if (path.length >= 2) {
-        paths.push([...path]);
-      }
-      return;
-    }
+    let hasVisitableNeighbor = false;
     for (const next of nexts) {
       if (!path.includes(next)) {
+        hasVisitableNeighbor = true;
         path.push(next);
         dfs(next, path);
         path.pop();
       }
+    }
+    if (!hasVisitableNeighbor && path.length >= 2) {
+      paths.push([...path]);
     }
   };
 
@@ -684,5 +837,17 @@ export function findChainsFromEdges(edges: InferredEdge[], assets: any[]): any[]
     dfs(start, [start]);
   });
 
-  return paths;
+  // Filter raw paths to remove contiguous subarrays/prefixes and duplicates
+  // Sort paths by length descending first to ensure longer paths are preserved
+  paths.sort((a, b) => b.length - a.length);
+
+  const uniquePaths: string[][] = [];
+  for (const path of paths) {
+    const isDuplicateOrSub = uniquePaths.some(kept => isSubarray(path, kept));
+    if (!isDuplicateOrSub) {
+      uniquePaths.push(path);
+    }
+  }
+
+  return uniquePaths;
 }

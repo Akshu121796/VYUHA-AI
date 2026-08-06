@@ -46,9 +46,13 @@ from classifier import classify_vuln
 
 load_dotenv()
 
+supabase_key = os.environ.get("SUPABASE_SECRET_ROLE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not supabase_key:
+    raise ValueError("Missing Supabase Service/Secret Role Key in environment variables.")
+
 supabase = create_client(
     os.environ["SUPABASE_URL"],
-    os.environ["SUPABASE_SECRET_ROLE_KEY"]
+    supabase_key
 )
 
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"

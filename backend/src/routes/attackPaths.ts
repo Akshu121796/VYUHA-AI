@@ -370,6 +370,8 @@ export default async function attackPathsRoutes(app: FastifyInstance) {
         findings: Array.from(edge.findings)
       }));
 
+      console.log(`Rows returned by GET /attack-paths: ${chains.length}`);
+
       return {
         chains,
         edges: inferredEdges,
