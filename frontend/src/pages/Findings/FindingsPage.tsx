@@ -109,7 +109,7 @@ export function FindingsPage() {
       {
         id: "riskScore",
         accessorKey: "severity",
-        header: "Risk Score",
+        header: () => <span>Overall Risk <span className="inline-flex items-center justify-center cursor-help text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 font-bold ml-1.5 text-[13px] select-none transition-colors align-middle" title="A number estimating how serious this issue is.">ⓘ</span></span>,
         cell: (info) => {
           const val = info.getValue() as string;
           const score = val === "critical" ? 10.0 : val === "high" ? 8.8 : val === "medium" ? 6.5 : 3.2;
@@ -201,7 +201,7 @@ export function FindingsPage() {
             SYS.DETECTION_LOGS
           </h1>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Triaging security findings across monitored corporate endpoints using TanStack datagrids.
+            Triaging security issues across monitored corporate endpoints using TanStack datagrids.
           </p>
         </div>
         <div className="flex gap-2">
@@ -213,16 +213,16 @@ export function FindingsPage() {
             onClick={() => {
               resetTelemetry.mutate(undefined, {
                 onSuccess: () => {
-                  toast.success("Telemetry logs reset to initial active state.");
+                  toast.success("Scan logs reset to initial active state.");
                 },
                 onError: (err: any) => {
-                  toast.error("Failed to reset telemetry: " + (err.message || "Unknown error"));
+                  toast.error("Failed to reset scan logs: " + (err.message || "Unknown error"));
                 }
               });
             }}
           >
             <RefreshCw className={cn("mr-1.5 h-3 w-3 text-brand-secondary", resetTelemetry.isPending && "animate-spin")} />
-            {resetTelemetry.isPending ? "RESETTING..." : "RESET TELEMETRY"}
+            {resetTelemetry.isPending ? "RESETTING..." : "RESET SCAN DATA"}
           </Button>
         </div>
       </div>
@@ -234,7 +234,7 @@ export function FindingsPage() {
           <div className="relative w-[220px]">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
             <Input
-              placeholder="Search assets, IDs..."
+              placeholder="Search devices, IDs..."
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               className="pl-9 h-8 text-xs font-mono border-slate-200 bg-slate-50/50"
@@ -315,7 +315,7 @@ export function FindingsPage() {
               <div className="h-full flex items-center justify-center p-6 bg-slate-50/30">
                 <EmptyState
                   title="No detections match parameters"
-                  description="We couldn't locate any findings matching your active filter configuration. Clear queries to rebuild telemetry."
+                  description="We couldn't locate any security issues matching your active filter configuration. Clear queries to rebuild scan data."
                   actionLabel="RESET CONSOLE FILTERS"
                   onAction={clearFilters}
                 />
@@ -542,7 +542,7 @@ export function FindingsPage() {
 
                     {selectedIncident.status === "resolved" && (
                       <div className="col-span-2 text-center py-2 text-[9px] font-mono text-cyber-low bg-cyber-low/5 border border-cyber-low/20 rounded-md">
-                        Incident closed by administrator. Telemetry marked clean.
+                        Incident closed by administrator. Scan data marked clean.
                       </div>
                     )}
 

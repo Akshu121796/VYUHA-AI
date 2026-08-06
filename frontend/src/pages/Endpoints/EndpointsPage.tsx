@@ -52,10 +52,10 @@ export function EndpointsPage() {
       <div className="flex flex-col gap-3 border-b border-slate-200/70 pb-5 dark:border-slate-800/70 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans dark:text-slate-100">
-            Assets Directory
+            Devices Directory
           </h1>
           <p className="mt-1 text-xs text-slate-500 font-sans dark:text-slate-400">
-            Audit hardware telemetry, OS kernel builds, and live CPU resource metrics across enrollment groups.
+            Audit hardware scan data, OS kernel builds, and live CPU resource metrics across enrollment groups.
           </p>
         </div>
         <div>
@@ -138,7 +138,7 @@ export function EndpointsPage() {
       {/* Main Grid View */}
       {filteredEndpoints.length === 0 ? (
         <EmptyState
-          title="No assets matching filters"
+          title="No devices matching filters"
           description="We couldn't locate any enrolled endpoints matching your active search parameter or filters."
           actionLabel="CLEAR ALL FILTERS"
           onAction={() => {
@@ -154,12 +154,14 @@ export function EndpointsPage() {
               <table className="w-full text-xs text-left border-collapse">
                 <thead className="border-b border-slate-200 bg-slate-50/50 font-mono uppercase tracking-wider text-slate-550 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-400">
                   <tr>
-                    <th className="p-3.5 pl-4 font-semibold">Hostname</th>
+                    <th className="p-3.5 pl-4 font-semibold">Device Name</th>
                     <th className="p-3.5 font-semibold hidden sm:table-cell">Platform</th>
                     <th className="p-3.5 font-semibold hidden md:table-cell">IP Address</th>
                     <th className="p-3.5 font-semibold hidden md:table-cell">Policy Group</th>
                     <th className="p-3.5 font-semibold hidden lg:table-cell">Resource Load</th>
-                    <th className="p-3.5 font-semibold">Vulnerability CVEs</th>
+                    <th className="p-3.5 font-semibold">
+                      Weakness CVEs <span className="inline-flex items-center justify-center cursor-help text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 font-bold ml-1.5 text-[13px] select-none transition-colors align-middle" title="A publicly known software security weakness.">ⓘ</span>
+                    </th>
                     <th className="p-3.5 font-semibold">Network Status</th>
                     <th className="p-3.5 text-right pr-4 font-semibold">Action</th>
                   </tr>
@@ -235,7 +237,7 @@ export function EndpointsPage() {
                           className="h-7 text-[10px]"
                           onClick={() => navigate(`/endpoints/${ep.id}`)}
                         >
-                          TELEMETRY
+                          SCAN DATA
                           <ArrowUpRight className="ml-1 h-3 w-3 text-slate-400" />
                         </Button>
                       </td>

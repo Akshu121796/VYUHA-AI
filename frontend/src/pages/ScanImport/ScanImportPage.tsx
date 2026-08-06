@@ -13,7 +13,8 @@ import {
   Clock,
   Database,
   ShieldAlert,
-  FileText
+  FileText,
+  ShieldCheck
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -34,11 +35,14 @@ type PageState = "idle" | "uploading" | "success" | "error";
 
 export interface SessionScanData {
   fileName: string;
-  detectedType: string;
+  detectedScanType: string;
   importedTime: string;
-  assets: number;
-  findings: number;
-  attackPaths: number;
+  assetsDiscovered: number;
+  findingsImported: number;
+  attackPathsGenerated: number;
+  attackPatternsMatched: number;
+  processingTime: string;
+  scanId: string | null;
 }
 
 export function ScanImportPage() {
@@ -70,11 +74,11 @@ export function ScanImportPage() {
   const loadingMessages = [
     "Uploading report XML payload to console...",
     "Running integration pipeline script parser...",
-    "Extracting host assets and structural topology...",
-    "Querying NVD API and CISA KEV reference database...",
-    "Executing AI-driven security finding classification...",
+    "Extracting host devices and network structure...",
+    "Querying vulnerability references database...",
+    "Executing AI-driven security issues classification...",
     "Rebuilding tactical network relationship map...",
-    "Regenerating active attack path graph..."
+    "Regenerating active attack routes..."
   ];
 
   React.useEffect(() => {
@@ -108,7 +112,7 @@ export function ScanImportPage() {
           
           const scanData: SessionScanData = {
             fileName: file.name,
-            detectedType: result.detectedScanType,
+            detectedScanType: result.detectedScanType,
             importedTime: new Date().toLocaleString("en-US", {
               year: "numeric",
               month: "short",
@@ -117,21 +121,30 @@ export function ScanImportPage() {
               minute: "2-digit",
               second: "2-digit",
             }),
-            assets: result.assetsDiscovered,
-            findings: result.findingsImported,
-            attackPaths: result.attackPathsGenerated,
+            assetsDiscovered: result.assetsDiscovered,
+            findingsImported: result.findingsImported,
+            attackPathsGenerated: result.attackPathsGenerated,
+            attackPatternsMatched: result.attackPatternsMatched,
+            processingTime: result.processingTime || "0s",
+            scanId: result.scanId || null
           };
           
+          sessionStorage.setItem("scanId", result.scanId || "");
+          sessionStorage.setItem("findingsImported", String(result.findingsImported));
+          sessionStorage.setItem("attackPathsGenerated", String(result.attackPathsGenerated));
+          sessionStorage.setItem("detectedScanType", result.detectedScanType);
+          sessionStorage.setItem("importedAt", new Date().toISOString());
+
           sessionStorage.setItem("vyuha_imported_scan", JSON.stringify(scanData));
           setImportedScan(scanData);
           setState("success");
-          toast.success("Telemetry report processed successfully.");
+          toast.success("Scan Successfully Imported");
         } catch (err: any) {
           console.error(err);
           const errorText = err.response?.data?.error || err.message || "Failed to process scan report.";
           setErrorMessage(errorText);
           setState("error");
-          toast.error("Telemetry import failed.");
+          toast.error("Scan data import failed.");
         }
       };
       reader.readAsText(file);
@@ -143,9 +156,18 @@ export function ScanImportPage() {
   };
 
   const handleClearScan = () => {
+    sessionStorage.removeItem("scanId");
+    sessionStorage.removeItem("findingsImported");
+    sessionStorage.removeItem("attackPathsGenerated");
+    sessionStorage.removeItem("detectedScanType");
+    sessionStorage.removeItem("importedAt");
     sessionStorage.removeItem("vyuha_imported_scan");
     setImportedScan(null);
     setState("idle");
+  };
+
+  const handleOpenAttackGraph = () => {
+    navigate("/graph");
   };
 
   // Drag & Drop event handlers
@@ -180,7 +202,7 @@ export function ScanImportPage() {
           Import Security Scan
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Upload an Nmap or OpenVAS XML report. VYUHA.AI automatically detects the scan type and generates assets, findings and attack paths.
+          Upload an Nmap or OpenVAS XML report. VYUHA.AI automatically detects the scan type and generates devices, security issues and attack routes.
         </p>
       </div>
 
@@ -325,7 +347,7 @@ export function ScanImportPage() {
                   <div>
                     <CardTitle className="text-base font-bold">Current Scan</CardTitle>
                     <CardDescription className="text-xs">
-                      Active security telemetry session.
+                      Active security scan data session.
                     </CardDescription>
                   </div>
                 </div>
@@ -335,6 +357,16 @@ export function ScanImportPage() {
               </div>
 
               <CardContent className="p-6 space-y-6">
+                {/* Success Banner */}
+                {importedScan.findingsImported > 0 && (
+                  <div className="p-4 border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/10 rounded-2xl flex items-center gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 animate-pulse" />
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-normal font-sans">
+                      Your scan has been analyzed and added to the current scan.
+                    </p>
+                  </div>
+                )}
+
                 {/* Scan Metadata */}
                 <div className="space-y-3.5 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/50 p-4.5 rounded-2xl">
                   <div className="flex items-center justify-between text-xs font-mono">
@@ -353,7 +385,7 @@ export function ScanImportPage() {
                       Detected Type
                     </span>
                     <Badge variant="secondary" className="font-semibold">
-                      {importedScan.detectedType}
+                      {importedScan.detectedScanType}
                     </Badge>
                   </div>
 
@@ -366,66 +398,99 @@ export function ScanImportPage() {
                       {importedScan.importedTime}
                     </span>
                   </div>
-                </div>
 
-                {/* Scan Metrics */}
-                <div>
-                  <h3 className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500 font-bold mb-3">
-                    Key Metrics
-                  </h3>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    {/* Assets */}
-                    <div className="bg-slate-50/50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/60 p-4 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50 dark:hover:bg-slate-950/50">
-                      <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 font-sans flex items-center gap-1">
-                        <Database className="h-3 w-3 text-cyan-500" />
-                        Assets
-                      </span>
-                      <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-2">
-                        {importedScan.assets}
-                      </span>
-                    </div>
-
-                    {/* Findings */}
-                    <div className="bg-slate-50/50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/60 p-4 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50 dark:hover:bg-slate-950/50">
-                      <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 font-sans flex items-center gap-1">
-                        <ShieldAlert className="h-3 w-3 text-rose-500" />
-                        Findings
-                      </span>
-                      <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-2">
-                        {importedScan.findings}
-                      </span>
-                    </div>
-
-                    {/* Attack Paths */}
-                    <div className="bg-slate-50/50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/60 p-4 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50 dark:hover:bg-slate-950/50">
-                      <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 font-sans flex items-center gap-1">
-                        <Network className="h-3 w-3 text-indigo-500" />
-                        Attack Paths
-                      </span>
-                      <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-2">
-                        {importedScan.attackPaths}
-                      </span>
-                    </div>
+                  <div className="flex items-center justify-between text-xs font-mono border-t border-slate-100/50 dark:border-slate-800/30 pt-3">
+                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                      Processing Time
+                    </span>
+                    <span className="text-slate-800 dark:text-slate-350 font-medium">
+                      {importedScan.processingTime}
+                    </span>
                   </div>
                 </div>
+
+                {/* Scan Metrics / Zero Findings check */}
+                {importedScan.findingsImported === 0 ? (
+                  <div className="p-5 border border-blue-100/50 dark:border-blue-900/30 bg-blue-50/10 dark:bg-blue-950/10 rounded-2xl flex flex-col items-center justify-center text-center">
+                    <ShieldCheck className="h-8 w-8 text-emerald-500 mb-2 animate-bounce" />
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 font-sans">
+                      No weaknesses were detected in this scan.
+                    </p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                      No attack routes were found.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500 font-bold mb-3">
+                      Key Metrics
+                    </h3>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Assets Imported */}
+                      <div className="bg-slate-50/50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/60 p-4 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50 dark:hover:bg-slate-950/50">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 font-sans flex items-center gap-1.5">
+                          <Database className="h-3.5 w-3.5 text-cyan-500" />
+                          Devices Imported
+                        </span>
+                        <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-2">
+                          {importedScan.assetsDiscovered}
+                        </span>
+                      </div>
+
+                      {/* Findings Imported */}
+                      <div className="bg-slate-50/50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/60 p-4 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50 dark:hover:bg-slate-950/50">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 font-sans flex items-center gap-1.5">
+                          <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />
+                          Security Issues Imported
+                        </span>
+                        <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-2">
+                          {importedScan.findingsImported}
+                        </span>
+                      </div>
+
+                      {/* Attack Paths Found */}
+                      <div className="bg-slate-50/50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/60 p-4 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50 dark:hover:bg-slate-950/50">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 font-sans flex items-center gap-1.5">
+                          <Network className="h-3.5 w-3.5 text-indigo-500" />
+                          Attack Routes Created
+                        </span>
+                        <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-2">
+                          {importedScan.attackPathsGenerated}
+                        </span>
+                      </div>
+
+                      {/* Attack Techniques Detected */}
+                      <div className="bg-slate-50/50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800/60 p-4 rounded-xl flex flex-col justify-between transition-all hover:bg-slate-50 dark:hover:bg-slate-950/50">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 font-sans flex items-center gap-1.5">
+                          <Zap className="h-3.5 w-3.5 text-amber-500" />
+                          Attack Techniques Detected
+                        </span>
+                        <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-2">
+                          {importedScan.attackPatternsMatched}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-col items-center justify-center p-5 border border-blue-100/50 dark:border-blue-900/30 bg-blue-50/10 dark:bg-blue-950/10 rounded-2xl">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40 text-cyber-primary border border-blue-100 dark:border-blue-900/30 mb-2">
                     <Zap className="h-4 w-4" />
                   </div>
                   <p className="text-xs text-slate-700 dark:text-slate-350 text-center font-medium">
-                    Attack graphs have been automatically updated based on the imported vulnerabilities and assets.
+                    Attack routes have been automatically updated based on the imported weaknesses and devices.
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-3 w-full mt-4 justify-center">
                     <Button
-                      onClick={() => navigate("/graph")}
+                      onClick={handleOpenAttackGraph}
                       variant="default"
-                      className="gap-2 font-semibold flex-1 justify-center"
+                      className="gap-2 font-semibold flex-1 justify-center animate-pulse"
                     >
                       <Network className="h-4 w-4" />
-                      Open Attack Graph
+                      View Attack Routes
                     </Button>
                     <Button
                       onClick={handleClearScan}
@@ -433,7 +498,7 @@ export function ScanImportPage() {
                       className="gap-2 font-semibold flex-1 justify-center border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
                     >
                       <FileUp className="h-4 w-4" />
-                      Import New Scan
+                      Upload Another Scan
                     </Button>
                   </div>
                 </div>

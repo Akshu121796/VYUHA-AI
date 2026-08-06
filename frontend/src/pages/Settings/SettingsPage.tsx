@@ -143,7 +143,7 @@ export function SettingsPage() {
 
   // Clearances list
   const clearances = [
-    { title: "Asset Telemetry Triaging", desc: "Read and review host directory profiles and process handles." },
+    { title: "Device Scan Data Triaging", desc: "Read and review host directory profiles and process handles." },
     { title: "PowerShell process execution", desc: "Quarantine processes and trigger administrative shells." },
     { title: "Boundary firewall overrides", desc: "Authorize Palo Alto edge IP block rules." }
   ];

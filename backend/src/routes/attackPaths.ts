@@ -42,13 +42,20 @@ function getAssetType(hostname: string, osType: string | null | undefined): stri
 
 export default async function attackPathsRoutes(app: FastifyInstance) {
   // GET /attack-paths
-  app.get("/attack-paths", { preHandler: authenticate }, async (req, reply) => {
+  app.get<{ Querystring: { scanId?: string } }>("/attack-paths", { preHandler: authenticate }, async (req, reply) => {
     try {
+      const { scanId } = req.query;
+
+      let attackPathsQuery = db.from("attack_paths").select("*");
+      if (scanId) {
+        attackPathsQuery = attackPathsQuery.eq("scan_id", scanId);
+      }
+
       // 1. Fetch assets, findings, attack_paths, and attack_patterns
       const [assetsRes, findingsRes, attackPathsRes, attackPatternsRes] = await Promise.all([
         db.from("assets").select("*"),
         db.from("findings").select("*").eq("status", "open"),
-        db.from("attack_paths").select("*"),
+        attackPathsQuery,
         db.from("attack_patterns").select("*")
       ]);
 
@@ -204,6 +211,7 @@ export default async function attackPathsRoutes(app: FastifyInstance) {
 
         return {
           id: dbPath.id,
+          scanId: dbPath.scan_id,
           patternName,
           severity,
           likelihood: getLikelihood(patternName),

@@ -260,7 +260,7 @@ export function DashboardPage() {
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <div><p className="text-[11px] font-medium theme-text-secondary">Security score</p><p className="mt-0.5 text-2xl font-semibold tracking-tight theme-text">94<span className="text-sm font-medium theme-text-muted">/100</span></p></div>
             <div><p className="text-[11px] font-medium theme-text-secondary">Threat level</p><p className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold theme-status-warning"><span className="h-2 w-2 rounded-full bg-cyber-high" /> Elevated</p></div>
-            <div><p className="text-[11px] font-medium theme-text-secondary">Today&apos;s findings</p><p className="mt-0.5 text-lg font-semibold theme-text">{activeIncidents.length} active</p></div>
+            <div><p className="text-[11px] font-medium theme-text-secondary">Today&apos;s security issues</p><p className="mt-0.5 text-lg font-semibold theme-text">{activeIncidents.length} active</p></div>
             <div><p className="text-[11px] font-medium theme-text-secondary">AI & latest scan</p><p className="mt-0.5 text-sm font-medium theme-status-success">Ready · 03:42 UTC</p></div>
           </div>
           <Button
@@ -282,7 +282,7 @@ export function DashboardPage() {
           <Card hoverable className="relative overflow-hidden border-t-2 border-t-red-400 bg-gradient-to-br from-red-50/35 via-white to-white dark:from-red-950/20 dark:via-slate-900/40 dark:to-slate-950/40">
             <div className="relative z-[1] pt-10 px-5 pb-5 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider theme-text-secondary">Critical findings</span>
+                <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider theme-text-secondary">Critical security issues</span>
                 <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 shrink-0">
                   <ShieldAlert className="h-4 w-4" />
                 </div>
@@ -437,7 +437,7 @@ export function DashboardPage() {
               {/* Centered details */}
               <div className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
                 <span className="text-xl font-bold font-mono tracking-tight text-slate-800">{incidents.length}</span>
-                <span className="text-[8px] font-mono text-slate-400 uppercase tracking-widest">Findings</span>
+                <span className="text-[8px] font-mono text-slate-400 uppercase tracking-widest">Security Issues</span>
               </div>
             </div>
             
@@ -496,7 +496,7 @@ export function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
               <CardTitle>Recent Detections</CardTitle>
-              <CardDescription>Latest telemetry indicators captured by active sensors</CardDescription>
+              <CardDescription>Latest scan data indicators captured by active sensors</CardDescription>
             </div>
             <Button variant="outline" size="sm" className="font-mono text-[9px] h-7" onClick={() => navigate("/findings")}>
               TRIAGE VIEW
@@ -510,7 +510,7 @@ export function DashboardPage() {
                   <tr>
                     <th className="p-3 pl-4">Incident ID</th>
                     <th className="p-3">Threat Description</th>
-                    <th className="p-3">Target Asset</th>
+                    <th className="p-3">Target Device</th>
                     <th className="p-3 hidden sm:table-cell">Security Category</th>
                     <th className="p-3 hidden md:table-cell">Incident State</th>
                     <th className="p-3 text-right pr-4">Action</th>
@@ -592,7 +592,7 @@ export function DashboardPage() {
             <div>
               <h4 className="text-xs font-bold font-mono tracking-wide text-blue-900 uppercase">AI Security Insight</h4>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed max-w-3xl">
-                We detected active privilege escalation vectors over LSASS memory reading hooks on <span className="font-semibold text-slate-800">ad-dc-windows-01</span>. Isolating the workstation via the active playbook is recommended to prevent credentials dumping.
+                We detected active elevated access attack routes over LSASS memory reading hooks on <span className="font-semibold text-slate-800">ad-dc-windows-01</span>. Isolating the workstation via the active playbook is recommended to prevent credentials dumping.
               </p>
             </div>
           </div>

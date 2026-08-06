@@ -85,7 +85,7 @@ export function EndpointDetailsPage() {
 
   // Trace logs mock specific to host
   const traceLogs = [
-    `[2026-07-12 03:42:00] [INFO] Telemetry agent version 2.4.1 checking in.`,
+    `[2026-07-12 03:42:00] [INFO] Scan agent version 2.4.1 checking in.`,
     `[2026-07-12 03:41:04] [WARN] Process spawn: powershell.exe -ExecutionPolicy Bypass -NoProfile -EncodedCommand Q2xlYXI...`,
     `[2026-07-12 03:38:10] [ALERT] LSASS process memory dump dump query recorded on PID 652 by NT AUTHORITY\\SYSTEM`,
     `[2026-07-12 03:37:05] [INFO] Connection established: RDP session from 10.120.40.112:54890`,
@@ -95,7 +95,7 @@ export function EndpointDetailsPage() {
   // Playbook recommendations
   const recommendations = [
     { title: "Isolate network interface at Edge Switch", desc: "Sever RDP/SSH pathways to isolate host vectors while retaining SOC VPN channels." },
-    { title: "Patch Netlogon protocol (Zerologon vulnerability)", desc: "Enforce domain controller registry keys to mandate secure Netlogon channels." },
+    { title: "Patch Netlogon protocol (Zerologon weakness)", desc: "Enforce domain controller registry keys to mandate secure Netlogon channels." },
     { title: "Audit local administrator groups", desc: "Review workstation access groups to restrict lateral movement credential dumps." }
   ];
 
@@ -108,7 +108,7 @@ export function EndpointDetailsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <span className="text-slate-300">/</span>
-          <span className="text-brand-secondary hover:text-slate-900 cursor-pointer" onClick={() => navigate("/endpoints")}>ASSETS</span>
+          <span className="text-brand-secondary hover:text-slate-900 cursor-pointer" onClick={() => navigate("/endpoints")}>DEVICES</span>
           <span className="text-slate-300">/</span>
           <span className="text-slate-900 font-semibold">{endpoint.hostname}</span>
         </div>
@@ -120,7 +120,7 @@ export function EndpointDetailsPage() {
             onClick={handleToggleIsolation}
           >
             <ShieldX className="mr-1.5 h-3.5 w-3.5" />
-            {endpoint.status === "isolated" ? "RECONNECT NETWORK" : "ISOLATE ASSET"}
+            {endpoint.status === "isolated" ? "RECONNECT NETWORK" : "ISOLATE DEVICE"}
           </Button>
         </div>
       </div>
@@ -190,7 +190,7 @@ export function EndpointDetailsPage() {
                 : "border-transparent text-slate-400 hover:text-slate-900"
             )}
           >
-            {tab === "vulns" ? "Vulnerabilities" : tab}
+            {tab === "vulns" ? "Weaknesses" : tab}
           </button>
         ))}
       </div>
@@ -208,8 +208,10 @@ export function EndpointDetailsPage() {
                 {/* SVG Risk score Dial */}
                 <Card className="flex flex-col items-center justify-center p-5 min-h-[200px] shadow-card">
                   <CardHeader className="text-center border-b-0 pb-0">
-                    <CardTitle className="text-slate-700">Asset Risk Level</CardTitle>
-                    <CardDescription>Maximum CVSS score registered on this host</CardDescription>
+                    <CardTitle className="text-slate-700">Device Risk Level</CardTitle>
+                    <CardDescription>
+                      Maximum CVSS score <span className="inline-flex items-center justify-center cursor-help text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 font-bold ml-1.5 text-[13px] select-none transition-colors align-middle" title="Common Vulnerability Scoring System, a standard for rating security weaknesses.">ⓘ</span> registered on this host
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4 flex flex-col items-center justify-center relative w-full h-[140px]">
                     {/* SVG Radial Gauge */}
@@ -305,7 +307,7 @@ export function EndpointDetailsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-1.5 text-slate-700">
                     <Clock className="h-4 w-4 text-cyber-primary animate-pulse" />
-                    Recent Asset Events
+                    Recent Device Events
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-1">
@@ -334,15 +336,15 @@ export function EndpointDetailsPage() {
           <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
-                <CardTitle className="text-slate-700">Identified CVE Vulnerabilities</CardTitle>
-                <CardDescription>Known security vulnerabilities detected inside server library components</CardDescription>
+                <CardTitle className="text-slate-700">Identified CVE Weaknesses</CardTitle>
+                <CardDescription>Known security weaknesses detected inside server library components</CardDescription>
               </div>
               <Badge severity="critical" className="h-4 px-1">{endpoint.cves.length} DETECTED</Badge>
             </CardHeader>
             <CardContent className="p-0 border-t border-slate-200">
               {endpoint.cves.length === 0 ? (
                 <div className="py-12 text-center text-xs font-mono text-cyber-low bg-cyber-low/5">
-                  ✓ ZERO ACTIVE CVE VULNERABILITIES DETECTED ON THIS ASSET
+                  ✓ ZERO ACTIVE CVE WEAKNESSES DETECTED ON THIS DEVICE
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -452,7 +454,7 @@ export function EndpointDetailsPage() {
           <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
-                <CardTitle className="text-slate-700">Trace Logs Telemetry</CardTitle>
+                <CardTitle className="text-slate-700">Trace Logs Scan Data</CardTitle>
                 <CardDescription>Ingested kernel event logs for domain diagnostic triaging</CardDescription>
               </div>
               <Terminal className="h-4 w-4 text-slate-400" />

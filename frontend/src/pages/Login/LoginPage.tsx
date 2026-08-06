@@ -152,8 +152,8 @@ export function LoginPage({
           </h2>
           <p className="mt-3.5 text-sm text-slate-400 max-w-sm font-sans leading-relaxed">
             {role === "admin"
-              ? "Transition from detection to containment instantly. Execute live attack path analyses, manage critical isolation gates, and guide analyst response workflows."
-              : "Triage complex alerts, discover lateral movements, review file-less vulnerabilities, and interact with the AI Security Copilot."}
+              ? "Transition from detection to containment instantly. Execute live attack route analyses, manage critical isolation gates, and guide analyst response workflows."
+              : "Triage complex alerts, discover lateral movements, review file-less weaknesses, and interact with the AI Security Copilot."}
           </p>
         </div>
 
@@ -208,7 +208,7 @@ export function LoginPage({
                     <Activity className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors font-sans">Attack Path Investigations</h3>
+                    <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors font-sans">Attack Route Investigations</h3>
                     <p className="mt-1 text-xs leading-relaxed text-slate-400 font-sans">
                       Walk through complex threat graphs and track attacker actions to find the root cause.
                     </p>
@@ -223,7 +223,7 @@ export function LoginPage({
                   <div>
                     <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors font-sans">Copilot AI Diagnostics</h3>
                     <p className="mt-1 text-xs leading-relaxed text-slate-400 font-sans">
-                      Resolve findings using LLM-guided context and automated playbook recommendations.
+                      Resolve security issues using LLM-guided context and automated playbook recommendations.
                     </p>
                   </div>
                 </div>
@@ -234,7 +234,7 @@ export function LoginPage({
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors font-sans">Vulnerability & Evidence Triage</h3>
+                    <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors font-sans">Weakness & Evidence Triage</h3>
                     <p className="mt-1 text-xs leading-relaxed text-slate-400 font-sans">
                       Review sandbox threat reports, file hashing metrics, and host endpoint details in real-time.
                     </p>

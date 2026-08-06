@@ -41,14 +41,14 @@ export function Sidebar({ isCollapsed, onToggleCollapse, onNavigate }: SidebarPr
     { path: "/", name: "Dashboard", icon: <Landmark className="h-4 w-4" /> },
     {
       path: "/findings",
-      name: "Findings",
+      name: "Security Issues",
       icon: <ShieldAlert className="h-4 w-4" />,
       badge: activeFindingsCount > 0 ? activeFindingsCount : undefined,
       badgeColor: "border-red-200 bg-red-50 text-cyber-critical",
     },
     { path: "/endpoints", name: "Endpoints", icon: <Server className="h-4 w-4" /> },
-    { path: "/scan-import", name: "Scan Import", icon: <FileUp className="h-4 w-4" /> },
-    { path: "/graph", name: "Attack Paths", icon: <Network className="h-4 w-4" /> },
+    { path: "/scan-import", name: "Import Security Scan", icon: <FileUp className="h-4 w-4" /> },
+    { path: "/graph", name: "Attack Routes", icon: <Network className="h-4 w-4" /> },
     { path: "/copilot", name: "AI Copilot", icon: <MessageSquareCode className="h-4 w-4" /> },
     {
       path: "/approvals",

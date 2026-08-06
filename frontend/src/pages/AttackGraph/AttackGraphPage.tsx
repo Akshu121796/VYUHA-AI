@@ -24,7 +24,8 @@ import {
   Flame, 
   CornerDownRight, 
   Compass,
-  Monitor
+  Monitor,
+  FileUp
 } from "lucide-react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -32,9 +33,29 @@ import { cn } from "../../utils/cn";
 import { toast } from "sonner";
 import { useAttackGraphData, useIncidentsData } from "../../hooks/queries/useVyuhaQueries";
 import dagre from "dagre";
-import ELK from "elkjs/lib/elk.bundled.js";
+import { attackGraphService } from "../../services/attackGraphService";
+import { apiClient } from "../../services/apiClient";
 
-const elk = new ELK();
+// Intercept graph nodes API calls to prevent loading stale DB graphs when 0 paths generated or session is empty
+const originalGetGraphNodes = attackGraphService.getGraphNodes;
+attackGraphService.getGraphNodes = async () => {
+  const hasActiveSession = sessionStorage.getItem("importedAt") !== null;
+  const attackPathsGeneratedStr = sessionStorage.getItem("attackPathsGenerated");
+  const attackPathsGenerated = attackPathsGeneratedStr !== null ? parseInt(attackPathsGeneratedStr, 10) : 0;
+  const scanId = sessionStorage.getItem("scanId");
+
+  if (!hasActiveSession || attackPathsGenerated <= 0) {
+    return { nodes: [], edges: [], chains: [] };
+  }
+
+  if (scanId) {
+    const res = await apiClient.get(`/attack-paths?scanId=${scanId}`);
+    return res.data;
+  }
+
+  return originalGetGraphNodes();
+};
+
 
 // Node Interface details
 interface AttackNodeData {
@@ -138,12 +159,12 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
       {/* Rich Hover Tooltip */}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 w-64 p-3 rounded-lg bg-slate-950 border border-slate-800 text-[10px] text-slate-200 leading-normal opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-premium">
         <div className="border-b border-slate-800 pb-1.5 mb-1.5 flex justify-between items-center">
-          <span className="font-mono text-[8px] uppercase font-bold text-blue-400">NODE TELEMETRY</span>
+          <span className="font-mono text-[8px] uppercase font-bold text-blue-400">DEVICE SCAN DATA</span>
           <span className="text-[8px] font-mono text-slate-400">{data.ip}</span>
         </div>
         
         <div className="space-y-1.5 font-sans text-left">
-          <p><strong className="text-slate-450 font-mono text-[9px]">Hostname:</strong> <span className="text-slate-100 font-semibold">{data.label}</span></p>
+          <p><strong className="text-slate-455 font-mono text-[9px]">Device Name:</strong> <span className="text-slate-100 font-semibold">{data.label}</span></p>
           <p><strong className="text-slate-455 font-mono text-[9px]">Type:</strong> {data.subtitle}</p>
           <p><strong className="text-slate-455 font-mono text-[9px]">Severity:</strong> <span className={cn(
             "uppercase font-semibold",
@@ -152,11 +173,13 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
             data.severity === "medium" && "text-yellow-400",
             data.severity === "low" && "text-green-400"
           )}>{data.severity}</span></p>
-          <p><strong className="text-slate-455 font-mono text-[9px]">Open Findings:</strong> {data.findingsCount}</p>
+          <p><strong className="text-slate-455 font-mono text-[9px]">Open Security Issues:</strong> {data.findingsCount}</p>
           
           {data.cves && data.cves.length > 0 && (
             <div className="pt-1 border-t border-slate-900 mt-1">
-              <strong className="text-slate-455 font-mono text-[8.5px] block mb-1">CVEs:</strong>
+              <strong className="text-slate-455 font-mono text-[8.5px] block mb-1">
+                CVEs <span className="inline-flex items-center justify-center cursor-help text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 font-bold ml-1.5 text-[13px] select-none transition-colors align-middle" title="A publicly known software security weakness.">ⓘ</span>:
+              </strong>
               <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
                 {data.cves.map((cve: string, idx: number) => (
                   <span key={idx} className="text-[8px] font-mono bg-red-950/40 text-red-300 border border-red-900/30 px-1 rounded">
@@ -169,7 +192,9 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
 
           {data.tactics && data.tactics.length > 0 && (
             <div className="pt-1 border-t border-slate-900 mt-1">
-              <strong className="text-slate-455 font-mono text-[8.5px] block mb-1">MITRE Tactics:</strong>
+              <strong className="text-slate-455 font-mono text-[8.5px] block mb-1">
+                Attack Methods <span className="inline-flex items-center justify-center cursor-help text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 font-bold ml-1.5 text-[13px] select-none transition-colors align-middle" title="An industry framework describing common attacker methods.">ⓘ</span>:
+              </strong>
               <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
                 {data.tactics.map((tactic: string, idx: number) => (
                   <span key={idx} className="text-[8px] font-mono bg-blue-950/40 text-blue-300 border border-blue-900/30 px-1 rounded">
@@ -186,45 +211,49 @@ const CustomAttackNode = ({ data }: NodeProps<AttackNodeData>) => {
   );
 };
 
-// ELK.js Layout function for automatic placement
-const elkLayout = async (nodes: any[], edges: any[]) => {
-  const elkGraph = {
-    id: "root",
-    layoutOptions: {
-      "elk.algorithm": "layered",
-      "elk.direction": "RIGHT",
-      "elk.spacing.nodeNode": "100",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "150",
-      "elk.padding": "[top=50,left=50,bottom=50,right=50]",
-      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP"
-    },
-    children: nodes.map((node) => ({
-      id: node.id,
-      width: 220,
-      height: 60
-    })),
-    edges: edges.map((edge) => ({
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target]
-    }))
-  };
+// Dagre layout function for automatic placement in LR hierarchy
+const dagreLayout = async (nodes: any[], edges: any[]) => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  const isLargeGraph = nodes.length > 15;
+  const nodeWidth = 220;
+  const nodeHeight = 60;
+  
+  // Custom horizontal/vertical spacing
+  const ranksep = isLargeGraph ? 220 : 150; // horizontal spacing between layers
+  const nodesep = isLargeGraph ? 95 : 60;   // vertical spacing between sibling nodes
+
+  dagreGraph.setGraph({
+    rankdir: "LR", // left-to-right hierarchical layout
+    ranksep,
+    nodesep,
+    marginx: 50,
+    marginy: 50
+  });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
 
   try {
-    const layoutedGraph = await elk.layout(elkGraph);
+    dagre.layout(dagreGraph);
     return nodes.map((node) => {
-      const elkNode = layoutedGraph.children?.find((c) => c.id === node.id);
+      const nodeWithPosition = dagreGraph.node(node.id);
       return {
         ...node,
         position: {
-          x: elkNode?.x ?? 0,
-          y: elkNode?.y ?? 0
+          x: nodeWithPosition.x - nodeWidth / 2,
+          y: nodeWithPosition.y - nodeHeight / 2
         }
       };
     });
   } catch (err) {
-    console.error("ELK layout failed", err);
+    console.error("Dagre layout failed", err);
     return nodes.map((node, idx) => ({
       ...node,
       position: {
@@ -295,6 +324,34 @@ function AttackGraphCanvas({
 
 export function AttackGraphPage() {
   const navigate = useNavigate();
+  const hasActiveSession = sessionStorage.getItem("importedAt") !== null;
+  const scanId = sessionStorage.getItem("scanId");
+  const findingsImportedStr = sessionStorage.getItem("findingsImported");
+  const findingsImported = findingsImportedStr !== null ? parseInt(findingsImportedStr, 10) : 0;
+  const attackPathsGeneratedStr = sessionStorage.getItem("attackPathsGenerated");
+  const attackPathsGenerated = attackPathsGeneratedStr !== null ? parseInt(attackPathsGeneratedStr, 10) : 0;
+  const detectedScanType = sessionStorage.getItem("detectedScanType") || "Unknown";
+  const importedAt = sessionStorage.getItem("importedAt");
+
+  let fileName = "";
+  let assetsDiscovered = 0;
+  let importedTimeStr = "";
+  const savedScan = sessionStorage.getItem("vyuha_imported_scan");
+  if (savedScan) {
+    try {
+      const parsed = JSON.parse(savedScan);
+      fileName = parsed.fileName || "";
+      assetsDiscovered = parsed.assetsDiscovered || 0;
+      importedTimeStr = parsed.importedTime || "";
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  const displayImportedTime = importedTimeStr || (importedAt ? new Date(importedAt).toLocaleString() : "");
+  const isEmptyState = !hasActiveSession || attackPathsGenerated <= 0;
+
+
   const { data: responseData, isLoading } = useAttackGraphData();
   const { data: incidentsData } = useIncidentsData();
 
@@ -310,14 +367,123 @@ export function AttackGraphPage() {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
 
+  const mapChain = (c: any) => {
+    const mapTacticStr = (t: string) => {
+      if (t === "Credential Access") return "Credential Theft";
+      if (t === "Initial Access") return "Initial Entry";
+      if (t === "Privilege Escalation") return "Elevated Access";
+      if (t === "Lateral Movement") return "Moving Between Devices";
+      if (t === "Defense Evasion") return "Avoiding Detection";
+      if (t === "Persistence") return "Staying Inside Network";
+      if (t === "Discovery") return "Network Discovery";
+      if (t === "Execution") return "Code Execution";
+      if (t === "Collection") return "Data Collection";
+      if (t === "Exfiltration") return "Data Theft";
+      return t;
+    };
+
+    return {
+      ...c,
+      patternName: (c.patternName || "")
+        .replace("Attack Chain:", "Attack Sequence:")
+        .replace("Web Exploit Chain:", "Web Exploit Sequence:")
+        .replace("Service Exposure Chain:", "Service Exposure Sequence:")
+        .replace("Lateral Pivot Chain:", "Lateral Pivot Sequence:")
+        .replace("Lateral Movement", "Moving Between Devices"),
+      description: (c.description || "")
+        .replace("entry point", "starting device")
+        .replace("targets", "targets device")
+        .replace("vulnerability", "weakness")
+        .replace("vulnerabilities", "weaknesses"),
+      remediations: (c.remediations || []).map((r: string) => {
+        return r.replace("vulnerabilities", "weaknesses").replace("vulnerability", "weakness").replace("assets", "devices").replace("asset", "device");
+      }),
+      path: (c.path || []).map((p: any) => ({
+        ...p,
+        assetType: p.assetType ? p.assetType.replace("Server", "Device") : "Device",
+        tactics: (p.tactics || []).map(mapTacticStr)
+      }))
+    };
+  };
+
   // Safely extract chains and edges from custom backend layout wrapper
-  const chains = useMemo(() => responseData?.chains || [], [responseData]);
-  const backendEdges = useMemo(() => responseData?.edges || [], [responseData]);
+  const chains = useMemo(() => {
+    let list = responseData?.chains || [];
+    if (hasActiveSession && scanId) {
+      list = list.filter((c: any) => c.scanId === scanId);
+    }
+    return list.map(mapChain);
+  }, [responseData, hasActiveSession, scanId]);
 
   // Union list of unique assets across all threat vectors
   const uniqueAssetsList = useMemo(() => {
-    return responseData?.nodes || [];
-  }, [responseData]);
+    const rawNodes = responseData?.nodes || [];
+    const mapTacticStr = (t: string) => {
+      if (t === "Credential Access") return "Credential Theft";
+      if (t === "Initial Access") return "Initial Entry";
+      if (t === "Privilege Escalation") return "Elevated Access";
+      if (t === "Lateral Movement") return "Moving Between Devices";
+      if (t === "Defense Evasion") return "Avoiding Detection";
+      if (t === "Persistence") return "Staying Inside Network";
+      if (t === "Discovery") return "Network Discovery";
+      if (t === "Execution") return "Code Execution";
+      if (t === "Collection") return "Data Collection";
+      if (t === "Exfiltration") return "Data Theft";
+      return t;
+    };
+
+    let filtered = rawNodes;
+    if (hasActiveSession && scanId) {
+      const activeAssetIds = new Set<string>();
+      activeAssetIds.add("internet-node");
+      chains.forEach((c: any) => {
+        c.path?.forEach((p: any) => {
+          if (p.id) activeAssetIds.add(p.id);
+        });
+      });
+      filtered = rawNodes.filter((node: any) => activeAssetIds.has(node.id));
+    }
+
+    return filtered.map((node: any) => ({
+      ...node,
+      assetType: node.assetType ? node.assetType.replace("Server", "Device") : "Device",
+      tactics: (node.tactics || []).map(mapTacticStr)
+    }));
+  }, [responseData, chains, hasActiveSession, scanId]);
+
+  const backendEdges = useMemo(() => {
+    const rawEdges = responseData?.edges || [];
+    if (hasActiveSession && scanId) {
+      const activeAssetIds = new Set<string>();
+      activeAssetIds.add("internet-node");
+      chains.forEach((c: any) => {
+        c.path?.forEach((p: any) => {
+          if (p.id) activeAssetIds.add(p.id);
+        });
+      });
+      return rawEdges.filter((edge: any) => activeAssetIds.has(edge.source) && activeAssetIds.has(edge.target));
+    }
+    return rawEdges;
+  }, [responseData, chains, hasActiveSession, scanId]);
+
+  useEffect(() => {
+    if (chains.length > 0 && selectedChainId === "all") {
+      const saved = sessionStorage.getItem("vyuha_imported_scan");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.scanId) {
+            const matched = chains.find((c: any) => c.scanId === parsed.scanId);
+            if (matched) {
+              setSelectedChainId(matched.id);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, [chains, selectedChainId]);
 
   // Sync nodes and edges on change in findings/selection states
   useEffect(() => {
@@ -371,7 +537,7 @@ export function AttackGraphPage() {
           severity: asset.severity || "medium",
           findingsCount: asset.findings || 0,
           ip: asset.ip || "0.0.0.0",
-          description: asset.description || `Active telemetry findings on ${asset.assetName}.`,
+          description: asset.description || `Active scan data security issues on ${asset.assetName}.`,
           cves: asset.cves || [],
           tactics: asset.tactics || [],
           isInSelectedChain: isInChain,
@@ -382,51 +548,56 @@ export function AttackGraphPage() {
       };
     });
 
-    // Build edges from inferred backend edges list
-    const edges = backendEdges.map((edge: any) => {
-      const isSelectedChain = activeChain 
-        ? activeChain.path.some((n: any) => n.id === edge.source) && activeChain.path.some((n: any) => n.id === edge.target)
-        : chains.some((c: any) => c.path.some((n: any) => n.id === edge.source) && c.path.some((n: any) => n.id === edge.target));
-      
-      const targetNode = uniqueAssetsList.find((n: any) => n.id === edge.target);
-      const strokeColor = isSelectedChain 
-        ? (targetNode?.severity === "critical" ? "#ef4444" : "#f59e0b") 
-        : "#4a5a80";
-      
-      let edgeOpacity = 0.8;
-      if (targetNodeId) {
-        edgeOpacity = (edge.source === targetNodeId || edge.target === targetNodeId) ? 1.0 : 0.15;
-      } else if (activeChain) {
-        edgeOpacity = isSelectedChain ? 1.0 : 0.15;
-      }
-
-      return {
-        id: `edge-${edge.source}-${edge.target}`,
-        source: edge.source,
-        target: edge.target,
-        animated: activeChain ? isSelectedChain : false,
-        style: { 
-          stroke: strokeColor, 
-          strokeWidth: isSelectedChain ? 2.5 : 1.5,
-          opacity: edgeOpacity
-        },
-        markerEnd: { 
-          type: MarkerType.ArrowClosed, 
-          color: strokeColor,
-          width: 16,
-          height: 16
-        },
-        data: {
-          reason: edge.reason,
-          rule: edge.rule,
-          cves: edge.cves || [],
-          findings: edge.findings || []
+    // Build unique edges from inferred backend edges list to reuse common edges
+    const uniqueEdgesMap = new Map<string, any>();
+    backendEdges.forEach((edge: any) => {
+      const edgeId = `edge-${edge.source}-${edge.target}`;
+      if (!uniqueEdgesMap.has(edgeId)) {
+        const isSelectedChain = activeChain 
+          ? activeChain.path.some((n: any) => n.id === edge.source) && activeChain.path.some((n: any) => n.id === edge.target)
+          : chains.some((c: any) => c.path.some((n: any) => n.id === edge.source) && c.path.some((n: any) => n.id === edge.target));
+        
+        const targetNode = uniqueAssetsList.find((n: any) => n.id === edge.target);
+        const strokeColor = isSelectedChain 
+          ? (targetNode?.severity === "critical" ? "#ef4444" : "#f59e0b") 
+          : "#4a5a80";
+        
+        let edgeOpacity = 0.8;
+        if (targetNodeId) {
+          edgeOpacity = (edge.source === targetNodeId || edge.target === targetNodeId) ? 1.0 : 0.15;
+        } else if (activeChain) {
+          edgeOpacity = isSelectedChain ? 1.0 : 0.15;
         }
-      };
+
+        uniqueEdgesMap.set(edgeId, {
+          id: edgeId,
+          source: edge.source,
+          target: edge.target,
+          animated: activeChain ? isSelectedChain : false,
+          style: { 
+            stroke: strokeColor, 
+            strokeWidth: isSelectedChain ? 2.5 : 1.5,
+            opacity: edgeOpacity
+          },
+          markerEnd: { 
+            type: MarkerType.ArrowClosed, 
+            color: strokeColor,
+            width: 16,
+            height: 16
+          },
+          data: {
+            reason: edge.reason,
+            rule: edge.rule,
+            cves: edge.cves || [],
+            findings: edge.findings || []
+          }
+        });
+      }
     });
+    const edges = Array.from(uniqueEdgesMap.values());
 
     let active = true;
-    elkLayout(rawNodes, edges).then((layoutedNodes) => {
+    dagreLayout(rawNodes, edges).then((layoutedNodes) => {
       if (active) {
         setRfNodes(layoutedNodes);
         setRfEdges(edges);
@@ -440,7 +611,19 @@ export function AttackGraphPage() {
 
   // Aggregate selected threat vector details for inspector panel
   const selectedChain = useMemo(() => {
-    if (!chains || !Array.isArray(chains) || chains.length === 0) return null;
+    if (!chains || !Array.isArray(chains) || chains.length === 0) {
+      return {
+        id: "none",
+        patternName: "No Threat Vector",
+        severity: "Low",
+        likelihood: "Low",
+        businessImpact: "Low",
+        description: "No attack paths could be inferred from the current scan.",
+        mitreTechniques: [],
+        path: [],
+        remediations: []
+      };
+    }
     
     if (selectedChainId === "all") {
       const allMitre = new Set<string>();
@@ -508,19 +691,19 @@ export function AttackGraphPage() {
     return `${percentage}% prepared`;
   }, [incidentsData]);
 
-  if (isLoading || !responseData) {
+  if (!isEmptyState && (isLoading || !responseData)) {
     return (
       <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] justify-center items-center font-mono">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyber-primary" />
-        <p className="text-xs text-slate-400 mt-3">Loading dynamic attack paths...</p>
+        <p className="text-xs text-slate-400 mt-3">Loading dynamic attack routes...</p>
       </div>
     );
   }
 
-  if (chains.length === 0) {
+  if (!isEmptyState && chains.length === 0) {
     return (
       <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] justify-center items-center font-mono text-center">
-        <p className="text-sm text-slate-400 font-sans">No attack paths detected in the network.</p>
+        <p className="text-sm text-slate-400 font-sans">No attack routes were found in the network.</p>
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mt-2 text-xs">
           Return to Dashboard
         </Button>
@@ -535,11 +718,18 @@ export function AttackGraphPage() {
       {/* Header */}
       <div className="flex justify-between items-center border-b border-slate-200 pb-3 shrink-0 dark:border-slate-800">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans dark:text-slate-100">
-            Attack Path Analyst
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans dark:text-slate-100">
+              {hasActiveSession && fileName ? `Attack Routes • ${fileName}` : "Attack Routes"}
+            </h1>
+            {hasActiveSession && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider bg-cyber-primary/10 text-cyber-primary border border-cyber-primary/20 uppercase">
+                ACTIVE INVESTIGATION
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 mt-0.5 font-sans dark:text-slate-400">
-            Visual attack path analysis mapping credential compromise, privilege escalation, and lateral containment gates.
+            Visual attack route analysis mapping credential theft, elevated access, and protection status.
           </p>
         </div>
         <div>
@@ -549,68 +739,139 @@ export function AttackGraphPage() {
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Threat vectors</p>
-          <p className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-slate-100">{threatStagesVal}</p>
+      {!hasActiveSession ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-900 border border-slate-800 rounded-2xl my-auto">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-slate-400 border border-slate-700 mb-4">
+            <ShieldAlert className="h-6 w-6 text-cyber-primary animate-pulse" />
+          </div>
+          <h3 className="text-base font-bold text-slate-200">
+            No active investigation.
+          </h3>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm">
+            Import a security scan to trace weakness pathways and propagation maps.
+          </p>
+          <Button 
+            onClick={() => navigate("/scan-import")} 
+            className="mt-4 gap-2 font-semibold bg-cyber-primary text-white"
+          >
+            <FileUp className="h-4 w-4" />
+            Import Security Scan
+          </Button>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Critical nodes</p>
-          <p className="mt-0.5 text-lg font-semibold text-cyber-critical">{criticalNodesVal}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Containment readiness</p>
-          <p className="mt-0.5 text-lg font-semibold text-cyber-low">{containmentReadinessVal}</p>
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* Active Investigation Context Header */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyber-primary/10 text-cyber-primary border border-cyber-primary/20 shrink-0">
+                <Network className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block leading-none">Current Scan</span>
+                <span className="text-xs font-semibold text-slate-200 mt-0.5 block truncate max-w-[200px]" title={fileName}>
+                  {fileName || "Unnamed Scan"}
+                </span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 md:gap-6 border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-6 flex-1">
+              <div>
+                <span className="text-[9px] font-mono text-slate-500 block uppercase leading-none">Scan Type</span>
+                <span className="text-[11px] font-semibold text-slate-300 font-mono mt-0.5 block">{detectedScanType}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-mono text-slate-500 block uppercase leading-none">Imported Time</span>
+                <span className="text-[11px] font-semibold text-slate-350 mt-0.5 block">{displayImportedTime}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-mono text-slate-500 block uppercase leading-none">Devices</span>
+                <span className="text-[11px] font-semibold text-slate-350 font-mono mt-0.5 block">{assetsDiscovered}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-mono text-slate-500 block uppercase leading-none">Security Issues</span>
+                <span className="text-[11px] font-semibold text-slate-350 font-mono mt-0.5 block">{findingsImported}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-mono text-slate-500 block uppercase leading-none">Attack Routes</span>
+                <span className="text-[11px] font-semibold text-slate-350 font-mono mt-0.5 block">{attackPathsGenerated}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
+            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Attack Routes Found</p>
+              <p className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-slate-100">{threatStagesVal}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">High-Risk Devices</p>
+              <p className="mt-0.5 text-lg font-semibold text-cyber-critical">{criticalNodesVal}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <p className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">Protection Status</p>
+              <p className="mt-0.5 text-lg font-semibold text-cyber-low">{containmentReadinessVal}</p>
+            </div>
+          </div>
 
 
       {/* Primary Split container */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 flex-1 min-h-0 items-stretch">
-        
-        {/* Visualizer Canvas Area (75% width) */}
+               {/* Visualizer Canvas Area (75% width) */}
         <div className="xl:col-span-9 border border-slate-200 bg-slate-950 rounded-xl relative overflow-hidden flex flex-col min-h-[450px] shadow-card dark:border-slate-850">
           <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-slate-900 border border-slate-800 p-2 rounded-lg shadow-md select-none">
             <Flame className="h-4 w-4 text-cyber-critical animate-pulse" />
-            <span className="text-[10px] font-mono font-bold text-slate-100 uppercase tracking-wider">LIVE PROPAGATION CANVAS</span>
+            <span className="text-[10px] font-mono font-bold text-slate-100 uppercase tracking-wider">Attack Flow</span>
           </div>
-
+ 
           {/* Selector dropdown */}
-          <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-slate-900 border border-slate-800 p-1.5 px-3 rounded-lg shadow-md select-none">
-            <Sparkles className="h-3.5 w-3.5 text-blue-400" />
-            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Vector:</span>
-            <select
-              value={selectedChainId}
-              onChange={(e) => {
-                setSelectedChainId(e.target.value);
-                setSelectedNodeId("all");
-                setSelectedEdge(null);
-              }}
-              className="text-[10px] font-sans bg-transparent border-none outline-none font-semibold text-slate-100 cursor-pointer focus:ring-0"
-            >
-              <option value="all" className="bg-slate-900 text-slate-100">Show All Threat Vectors</option>
-              {chains.map((c: any) => (
-                <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100">
-                  {c.patternName} ({c.severity})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex-1 min-h-0 relative">
-            <ReactFlowProvider>
-              <AttackGraphCanvas
-                rfNodes={rfNodes}
-                rfEdges={rfEdges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                nodeTypes={nodeTypes}
-                handleNodeClick={handleNodeClick}
-                handleEdgeClick={handleEdgeClick}
-              />
-            </ReactFlowProvider>
-          </div>
+          {!isEmptyState && (
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-slate-900 border border-slate-800 p-1.5 px-3 rounded-lg shadow-md select-none">
+              <Sparkles className="h-3.5 w-3.5 text-blue-400" />
+              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Attack Route:</span>
+              <select
+                value={selectedChainId}
+                onChange={(e) => {
+                  setSelectedChainId(e.target.value);
+                  setSelectedNodeId("all");
+                  setSelectedEdge(null);
+                }}
+                className="text-[10px] font-sans bg-transparent border-none outline-none font-semibold text-slate-100 cursor-pointer focus:ring-0"
+              >
+                <option value="all" className="bg-slate-900 text-slate-100">Show All Attack Routes</option>
+                {chains.map((c: any) => (
+                  <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100">
+                    {c.patternName} ({c.severity})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+ 
+          {isEmptyState ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-950">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-slate-400 border border-slate-800 mb-4 animate-pulse">
+                <Network className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-semibold text-slate-200">
+                No attack routes could be inferred from the current scan.
+              </p>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 relative">
+              <ReactFlowProvider>
+                <AttackGraphCanvas
+                  rfNodes={rfNodes}
+                  rfEdges={rfEdges}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  nodeTypes={nodeTypes}
+                  handleNodeClick={handleNodeClick}
+                  handleEdgeClick={handleEdgeClick}
+                />
+              </ReactFlowProvider>
+            </div>
+          )}
 
           {/* Developer Debug Edge Inspector floating box */}
           {devMode && selectedEdge && (
@@ -669,7 +930,7 @@ export function AttackGraphPage() {
           <div className="flex-1 overflow-y-auto pr-1 space-y-5 max-h-[calc(100vh-180px)] w-full min-w-0">
             {/* Header info */}
             <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 w-full">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 block font-semibold">Stage Inspector</span>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 block font-semibold">Selected Attack Details</span>
               <h3 className="text-[13px] font-bold font-sans text-slate-800 dark:text-slate-100 mt-1 leading-snug break-words whitespace-normal w-full">
                 {selectedChain.patternName}
               </h3>
@@ -677,34 +938,36 @@ export function AttackGraphPage() {
                 <Badge severity={selectedChain.severity.toLowerCase() as any}>{selectedChain.severity}</Badge>
                 {selectedChain.likelihood && (
                   <span className="font-mono text-[8.5px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded dark:bg-slate-950 dark:border-slate-800 dark:text-slate-405">
-                    Likelihood: {selectedChain.likelihood}
+                    Chance of Attack: {selectedChain.likelihood}
                   </span>
                 )}
                 {selectedChain.businessImpact && (
                   <span className="font-mono text-[8.5px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded dark:bg-slate-950 dark:border-slate-800 dark:text-slate-405">
-                    Impact: {selectedChain.businessImpact}
+                    Damage Potential: {selectedChain.businessImpact}
                   </span>
                 )}
                 <span className="font-mono text-[8.5px] text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded dark:bg-slate-950 dark:border-slate-800 dark:text-slate-405">
-                  Risk Score: {(selectedChain.severity.toLowerCase() === "critical" ? 9.5 : selectedChain.severity.toLowerCase() === "high" ? 8.8 : selectedChain.severity.toLowerCase() === "medium" ? 6.5 : 3.2).toFixed(1)}
+                  Overall Risk <span className="inline-flex items-center justify-center cursor-help text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 font-bold ml-1.5 text-[13px] select-none transition-colors align-middle" title="A number estimating how serious this issue is.">ⓘ</span>: {(selectedChain.severity.toLowerCase() === "critical" ? 9.5 : selectedChain.severity.toLowerCase() === "high" ? 8.8 : selectedChain.severity.toLowerCase() === "medium" ? 6.5 : 3.2).toFixed(1)}
                 </span>
               </div>
             </div>
-
+ 
             {/* Description */}
             {selectedChain.description && (
               <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-1.5 w-full">
-                <strong className="text-slate-700 dark:text-slate-350 block font-mono text-[9px] uppercase">Path Description</strong>
+                <strong className="text-slate-700 dark:text-slate-350 block font-mono text-[9px] uppercase">Route Description</strong>
                 <p className="font-sans text-[11.5px] text-slate-600 dark:text-slate-400 break-words whitespace-normal w-full leading-relaxed">
                   {selectedChain.description}
                 </p>
               </div>
             )}
-
+ 
             {/* MITRE Techniques */}
             {selectedChain.mitreTechniques && selectedChain.mitreTechniques.length > 0 && (
               <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-2 w-full">
-                <span className="font-mono text-[9px] uppercase tracking-wider text-slate-455 block font-bold dark:text-slate-400">MITRE Techniques</span>
+                <span className="font-mono text-[9px] uppercase tracking-wider text-slate-455 block font-bold dark:text-slate-400">
+                  Attack Techniques <span className="inline-flex items-center justify-center cursor-help text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 font-bold ml-1.5 text-[13px] select-none transition-colors align-middle" title="A method commonly used by attackers. Also references the MITRE ATT&CK framework.">ⓘ</span>
+                </span>
                 <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto w-full pr-1">
                   {selectedChain.mitreTechniques.map((tech: string, idx: number) => {
                     const code = tech.split(" - ")[0];
@@ -717,11 +980,11 @@ export function AttackGraphPage() {
                 </div>
               </div>
             )}
-
+ 
             {/* Assets Involved */}
             {selectedChain.path && selectedChain.path.length > 0 && (
               <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-2 w-full">
-                <span className="font-mono text-[9px] uppercase tracking-wider text-slate-455 block font-bold dark:text-slate-400">Assets Involved</span>
+                <span className="font-mono text-[9px] uppercase tracking-wider text-slate-455 block font-bold dark:text-slate-400">Devices Involved</span>
                 <div className="flex flex-col items-center bg-white border border-slate-200 p-2.5 rounded-lg dark:bg-slate-950 dark:border-slate-800 gap-1 text-[9.5px] font-mono text-slate-650 dark:text-slate-350 select-none max-h-40 overflow-y-auto w-full pr-1">
                   {selectedChain.path.map((node: any, idx: number) => (
                     <React.Fragment key={idx}>
@@ -732,12 +995,12 @@ export function AttackGraphPage() {
                 </div>
               </div>
             )}
-
+ 
             {/* Recommendations */}
             {selectedChain.remediations && selectedChain.remediations.length > 0 && (
               <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/40 space-y-2.5 w-full">
                 <h4 className="text-[9px] font-mono font-bold tracking-wider text-slate-455 uppercase flex items-center gap-1.5 dark:text-slate-400">
-                  <CornerDownRight className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Recommended Mitigations
+                  <CornerDownRight className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Recommended Fixes
                 </h4>
                 
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 w-full">
@@ -755,7 +1018,7 @@ export function AttackGraphPage() {
               </div>
             )}
           </div>
-
+ 
           {/* Action button */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-850 shrink-0 mt-3">
             <Button
@@ -765,12 +1028,14 @@ export function AttackGraphPage() {
               onClick={() => navigate(`/copilot?query=mitigate+${selectedChain.id}`)}
             >
               <Compass className="mr-1.5 h-3.5 w-3.5" />
-              DEPLOY MITIGATION WIZARD
+              Start Protection Guide
             </Button>
           </div>
         </div>
 
       </div>
+    </>
+    )}
     </div>
   );
 }

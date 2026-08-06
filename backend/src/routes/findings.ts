@@ -201,6 +201,7 @@ export default async function findingsRoutes(app: FastifyInstance) {
 
       const fileType = detectedType;
 
+      const startTime = Date.now();
       const fileName = `temp_${fileType}_${Date.now()}.xml`;
       const filePath = join(__dirname, "../../../integration", fileName);
       writeFileSync(filePath, fileContent, "utf8");
@@ -247,6 +248,22 @@ export default async function findingsRoutes(app: FastifyInstance) {
           console.log(`Assets inserted: ${assetsDiscovered}`);
           console.log(`Findings inserted: ${findingsImported}`);
 
+          const durationSec = ((Date.now() - startTime) / 1000).toFixed(2);
+          const processingTime = `${durationSec}s`;
+
+          if (findingsImported === 0) {
+            resolve({
+              assetsDiscovered: assetsDiscovered || 0,
+              findingsImported: 0,
+              attackPathsGenerated: 0,
+              attackPatternsMatched: 0,
+              detectedScanType: fileType === "nmap" ? "Nmap XML" : "OpenVAS XML",
+              processingTime,
+              scanId: null
+            });
+            return;
+          }
+
           try {
             const scanId = `scan-${Date.now()}`;
             console.log("attackPathEngine.execute() is actually called");
@@ -260,7 +277,7 @@ export default async function findingsRoutes(app: FastifyInstance) {
               const nameMap: Record<string, string> = {
                 "weak_cred_lateral_privesc": "Credential Attack Chain: Weak Passwords -> Lateral Movement -> Domain Admin",
                 "unpatched_service_privesc": "Web Exploit Chain: Public App -> RCE -> Database Access",
-                "misconfig_lateral_unpatched": "Service Exposure Chain: Open Port -> Exploitation -> Data Access"
+                "misconfig_lateral_unpatched": "Service Exposure Chain: Port -> Exploitation -> Data Access"
               };
               return nameMap[p.name] || p.name;
             });
@@ -282,7 +299,9 @@ export default async function findingsRoutes(app: FastifyInstance) {
               findingsImported,
               attackPathsGenerated: generatedPaths.length,
               attackPatternsMatched,
-              detectedScanType: fileType === "nmap" ? "Nmap XML" : "OpenVAS XML"
+              detectedScanType: fileType === "nmap" ? "Nmap XML" : "OpenVAS XML",
+              processingTime,
+              scanId
             });
           } catch (genErr: any) {
             console.error("Attack path generation error:", genErr);

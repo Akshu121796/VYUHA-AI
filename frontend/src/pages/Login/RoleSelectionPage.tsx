@@ -118,7 +118,7 @@ export function RoleSelectionPage() {
                 🛡 Security Analyst
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-sans leading-relaxed">
-                Investigate alerts, analyze attack paths, review vulnerabilities and interact with the AI Security Copilot.
+                Investigate alerts, analyze attack routes, review weaknesses and interact with the AI Security Copilot.
               </p>
             </div>
             <Button 

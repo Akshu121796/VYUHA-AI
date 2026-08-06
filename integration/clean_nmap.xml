@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<nmaprun scanner="nmap" start="1720000000">
+  <host>
+    <address addr="192.168.1.99" addrtype="ipv4"/>
+    <hostnames>
+      <hostname name="clean-endpoint-99"/>
+    </hostnames>
+    <ports>
+    </ports>
+  </host>
+</nmaprun>
