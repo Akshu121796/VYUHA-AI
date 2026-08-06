@@ -211,14 +211,20 @@ export default async function findingsRoutes(app: FastifyInstance) {
 
       let pythonCmd = process.platform === "win32" ? "python" : "python3";
       
-      // Check if local virtual environment binary exists
-      const venvPythonPath = join(__dirname, "../../../venv/bin/python");
-      const venvPythonPathWin = join(__dirname, "../../../venv/Scripts/python.exe");
+      // Check if local virtual environment binary exists (either in backend subfolder or root folder)
+      const venvBackendPythonPath = join(__dirname, "../../venv/bin/python");
+      const venvBackendPythonPathWin = join(__dirname, "../../venv/Scripts/python.exe");
+      const venvRootPythonPath = join(__dirname, "../../../venv/bin/python");
+      const venvRootPythonPathWin = join(__dirname, "../../../venv/Scripts/python.exe");
 
-      if (process.platform !== "win32" && require("fs").existsSync(venvPythonPath)) {
-        pythonCmd = venvPythonPath;
-      } else if (process.platform === "win32" && require("fs").existsSync(venvPythonPathWin)) {
-        pythonCmd = venvPythonPathWin;
+      if (process.platform !== "win32" && require("fs").existsSync(venvBackendPythonPath)) {
+        pythonCmd = venvBackendPythonPath;
+      } else if (process.platform !== "win32" && require("fs").existsSync(venvRootPythonPath)) {
+        pythonCmd = venvRootPythonPath;
+      } else if (process.platform === "win32" && require("fs").existsSync(venvBackendPythonPathWin)) {
+        pythonCmd = venvBackendPythonPathWin;
+      } else if (process.platform === "win32" && require("fs").existsSync(venvRootPythonPathWin)) {
+        pythonCmd = venvRootPythonPathWin;
       } else {
         // Ensure Python packages are installed dynamically at runtime (bulletproof fail-safe)
         try {
