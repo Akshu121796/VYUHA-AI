@@ -4,7 +4,7 @@ import { authenticate, requireRole } from "../core/auth";
 import { FindingCreate } from "../types/schemas";
 import { calculateRiskScore } from "../services/riskScoring";
 import { classifyVulnCategory } from "../services/vulnClassifier";
-import { exec } from "child_process";
+import { exec, execSync } from "child_process";
 import { writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { generateAttackPaths } from "../services/attackPathEngine";
@@ -210,6 +210,21 @@ export default async function findingsRoutes(app: FastifyInstance) {
       const scriptPath = join(__dirname, "../../../integration", scriptName);
 
       const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      
+      // Ensure Python packages are installed dynamically at runtime (bulletproof fail-safe)
+      try {
+        const checkCmd = `"${pythonCmd}" -c "import supabase, requests, dotenv"`;
+        execSync(checkCmd, { stdio: "ignore" });
+      } catch (err) {
+        console.log("Python dependencies missing at runtime. Installing supabase python-dotenv requests...");
+        try {
+          execSync(`"${pythonCmd}" -m pip install supabase python-dotenv requests`, { stdio: "ignore" });
+          console.log("Successfully installed python dependencies.");
+        } catch (installErr: any) {
+          console.error("Failed to install python dependencies via pip:", installErr.message);
+        }
+      }
+
       const command = `"${pythonCmd}" "${scriptPath}" "${filePath}"`;
 
       const execEnv = {
