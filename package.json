@@ -5,7 +5,7 @@
         "frontend": "cd frontend && npm run dev",
         "backend": "cd backend && npm run dev",
         "dev": "concurrently -n FRONTEND,BACKEND -c blue,green \"npm run backend\" \"npm run frontend\"",
-        "build": "(pip3 install supabase python-dotenv requests || pip install supabase python-dotenv requests || echo 'pip install skipped') && npm run build --prefix frontend && npm run build --prefix backend"
+        "build": "(python3 -m venv venv && ./venv/bin/pip install -r requirements.txt || pip3 install -r requirements.txt || pip install -r requirements.txt || echo 'pip install skipped') && npm run build --prefix frontend && npm run build --prefix backend"
     },
     "devDependencies": {
         "concurrently": "^9.0.0"

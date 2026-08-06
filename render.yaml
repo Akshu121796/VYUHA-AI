@@ -3,7 +3,7 @@ services:
     name: vyuha-backend
     env: node
     plan: free
-    buildCommand: npm install && (pip3 install -r requirements.txt || pip install -r requirements.txt || echo "pip install skipped") && npm run build --prefix backend
+    buildCommand: npm install && (python3 -m venv venv && ./venv/bin/pip install -r requirements.txt || pip3 install -r requirements.txt || pip install -r requirements.txt || echo "pip install skipped") && npm run build --prefix backend
     startCommand: npm run start --prefix backend
     envVars:
       - key: PORT

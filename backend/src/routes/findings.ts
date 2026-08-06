@@ -209,19 +209,29 @@ export default async function findingsRoutes(app: FastifyInstance) {
       const scriptName = fileType === "nmap" ? "import_nmap.py" : "import_openvas.py";
       const scriptPath = join(__dirname, "../../../integration", scriptName);
 
-      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      let pythonCmd = process.platform === "win32" ? "python" : "python3";
       
-      // Ensure Python packages are installed dynamically at runtime (bulletproof fail-safe)
-      try {
-        const checkCmd = `"${pythonCmd}" -c "import supabase, requests, dotenv"`;
-        execSync(checkCmd, { stdio: "ignore" });
-      } catch (err) {
-        console.log("Python dependencies missing at runtime. Installing supabase python-dotenv requests...");
+      // Check if local virtual environment binary exists
+      const venvPythonPath = join(__dirname, "../../../venv/bin/python");
+      const venvPythonPathWin = join(__dirname, "../../../venv/Scripts/python.exe");
+
+      if (process.platform !== "win32" && require("fs").existsSync(venvPythonPath)) {
+        pythonCmd = venvPythonPath;
+      } else if (process.platform === "win32" && require("fs").existsSync(venvPythonPathWin)) {
+        pythonCmd = venvPythonPathWin;
+      } else {
+        // Ensure Python packages are installed dynamically at runtime (bulletproof fail-safe)
         try {
-          execSync(`"${pythonCmd}" -m pip install supabase python-dotenv requests`, { stdio: "ignore" });
-          console.log("Successfully installed python dependencies.");
-        } catch (installErr: any) {
-          console.error("Failed to install python dependencies via pip:", installErr.message);
+          const checkCmd = `"${pythonCmd}" -c "import supabase, requests, dotenv"`;
+          execSync(checkCmd, { stdio: "ignore" });
+        } catch (err) {
+          console.log("Python dependencies missing at runtime. Installing supabase python-dotenv requests...");
+          try {
+            execSync(`"${pythonCmd}" -m pip install supabase python-dotenv requests`, { stdio: "ignore" });
+            console.log("Successfully installed python dependencies.");
+          } catch (installErr: any) {
+            console.error("Failed to install python dependencies via pip:", installErr.message);
+          }
         }
       }
 
