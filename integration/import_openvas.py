@@ -69,10 +69,14 @@ THREAT_TO_SEVERITY = {
 
 def get_kev_ids():
     print("Fetching CISA KEV list...")
-    r = requests.get(KEV_URL)
-    ids = {v["cveID"] for v in r.json()["vulnerabilities"]}
-    print(f"Loaded {len(ids)} KEV entries")
-    return ids
+    try:
+        r = requests.get(KEV_URL, timeout=7)
+        ids = {v["cveID"] for v in r.json()["vulnerabilities"]}
+        print(f"Loaded {len(ids)} KEV entries")
+        return ids
+    except Exception as e:
+        print(f"  [WARN] Failed to fetch CISA KEV list: {e}. Fallback to empty list.")
+        return set()
 
 
 def fetch_nvd(cve_id, kev_ids):
@@ -83,37 +87,49 @@ def fetch_nvd(cve_id, kev_ids):
     if os.environ.get("NVD_API_KEY"):
         headers["apiKey"] = os.environ["NVD_API_KEY"]
 
-    r = requests.get(url, params={"cveId": cve_id}, headers=headers)
-    if r.status_code != 200:
-        print(f"  ✗ Failed {cve_id} (status {r.status_code})")
-        return None
+    try:
+        r = requests.get(url, params={"cveId": cve_id}, headers=headers, timeout=7)
+        if r.status_code != 200:
+            print(f"  ✗ Failed {cve_id} (status {r.status_code})")
+            return None
 
-    data = r.json()
-    if not data.get("vulnerabilities"):
-        print(f"  ✗ No NVD data for {cve_id}")
-        return None
+        data = r.json()
+        if not data.get("vulnerabilities"):
+            print(f"  ✗ No NVD data for {cve_id}")
+            return None
 
-    vuln = data["vulnerabilities"][0]["cve"]
-    metrics = vuln.get("metrics", {})
-    cvss_list = metrics.get("cvssMetricV31", metrics.get("cvssMetricV30", []))
-    cvss_score = cvss_list[0]["cvssData"]["baseScore"] if cvss_list else 5.0
+        vuln = data["vulnerabilities"][0]["cve"]
+        metrics = vuln.get("metrics", {})
+        cvss_list = metrics.get("cvssMetricV31", metrics.get("cvssMetricV30", []))
+        cvss_score = cvss_list[0]["cvssData"]["baseScore"] if cvss_list else 5.0
 
-    if cvss_score >= 9.0:   severity = "critical"
-    elif cvss_score >= 7.0: severity = "high"
-    elif cvss_score >= 4.0: severity = "medium"
-    else:                   severity = "low"
+        if cvss_score >= 9.0:   severity = "critical"
+        elif cvss_score >= 7.0: severity = "high"
+        elif cvss_score >= 4.0: severity = "medium"
+        else:                   severity = "low"
 
-    is_kev = cve_id in kev_ids
-    risk_score = round(cvss_score + (2.0 if is_kev else 0), 2)
+        is_kev = cve_id in kev_ids
+        risk_score = round(cvss_score + (2.0 if is_kev else 0), 2)
 
-    return {
-        "cve_id":      cve_id,
-        "cvss_score":  cvss_score,
-        "severity":    severity,
-        "is_kev":      is_kev,
-        "risk_score":  risk_score,
-        "description": vuln["descriptions"][0]["value"]
-    }
+        return {
+            "cve_id":      cve_id,
+            "severity":    severity,
+            "risk_score":  risk_score,
+            "description": vuln.get("descriptions", [{}])[0].get("value", f"Security vulnerability {cve_id}."),
+            "remediation": "Update package to the latest version. Implement monitoring and access control."
+        }
+    except Exception as e:
+        print(f"  [WARN] Failed to fetch NVD details for {cve_id}: {e}. Using fallback defaults.")
+        is_kev = cve_id in kev_ids
+        cvss_score = 7.5
+        risk_score = round(cvss_score + (2.0 if is_kev else 0), 2)
+        return {
+            "cve_id":      cve_id,
+            "severity":    "high",
+            "risk_score":  risk_score,
+            "description": f"Security vulnerability {cve_id}.",
+            "remediation": "Update package to the latest version. Implement monitoring and access control."
+        }
 
 
 def _clean_cve_field(raw: str):

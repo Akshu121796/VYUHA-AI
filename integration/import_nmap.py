@@ -28,10 +28,14 @@ VERSION_CVE_MAP = {
 def get_kev_ids():
     print("Fetching CISA KEV list...")
     url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
-    r = requests.get(url)
-    ids = {v["cveID"] for v in r.json()["vulnerabilities"]}
-    print(f"Loaded {len(ids)} KEV entries")
-    return ids
+    try:
+        r = requests.get(url, timeout=7)
+        ids = {v["cveID"] for v in r.json()["vulnerabilities"]}
+        print(f"Loaded {len(ids)} KEV entries")
+        return ids
+    except Exception as e:
+        print(f"  [WARN] Failed to fetch CISA KEV list: {e}. Fallback to empty list.")
+        return set()
 
 def fetch_nvd(cve_id, kev_ids):
     url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={cve_id}"
@@ -39,37 +43,51 @@ def fetch_nvd(cve_id, kev_ids):
     if os.environ.get("NVD_API_KEY"):
         headers["apiKey"] = os.environ["NVD_API_KEY"]
 
-    r = requests.get(url, headers=headers)
-    if r.status_code != 200:
-        print(f"  ✗ Failed {cve_id} (status {r.status_code})")
-        return None
+    try:
+        r = requests.get(url, headers=headers, timeout=7)
+        if r.status_code != 200:
+            print(f"  ✗ Failed {cve_id} (status {r.status_code})")
+            return None
 
-    data = r.json()
-    if not data.get("vulnerabilities"):
-        print(f"  ✗ No NVD data for {cve_id}")
-        return None
+        data = r.json()
+        if not data.get("vulnerabilities"):
+            print(f"  ✗ No NVD data for {cve_id}")
+            return None
 
-    vuln = data["vulnerabilities"][0]["cve"]
-    metrics = vuln.get("metrics", {})
-    cvss_list = metrics.get("cvssMetricV31", metrics.get("cvssMetricV30", []))
-    cvss_score = cvss_list[0]["cvssData"]["baseScore"] if cvss_list else 5.0
+        vuln = data["vulnerabilities"][0]["cve"]
+        metrics = vuln.get("metrics", {})
+        cvss_list = metrics.get("cvssMetricV31", metrics.get("cvssMetricV30", []))
+        cvss_score = cvss_list[0]["cvssData"]["baseScore"] if cvss_list else 5.0
 
-    if cvss_score >= 9.0:   severity = "critical"
-    elif cvss_score >= 7.0: severity = "high"
-    elif cvss_score >= 4.0: severity = "medium"
-    else:                   severity = "low"
+        if cvss_score >= 9.0:   severity = "critical"
+        elif cvss_score >= 7.0: severity = "high"
+        elif cvss_score >= 4.0: severity = "medium"
+        else:                   severity = "low"
 
-    is_kev = cve_id in kev_ids
-    risk_score = round(cvss_score + (2.0 if is_kev else 0), 2)
+        is_kev = cve_id in kev_ids
+        risk_score = round(cvss_score + (2.0 if is_kev else 0), 2)
 
-    return {
-        "cve_id":      cve_id,
-        "cvss_score":  cvss_score,
-        "severity":    severity,
-        "is_kev":      is_kev,
-        "risk_score":  risk_score,
-        "description": vuln["descriptions"][0]["value"]
-    }
+        return {
+            "cve_id":      cve_id,
+            "cvss_score":  cvss_score,
+            "severity":    severity,
+            "is_kev":      is_kev,
+            "risk_score":  risk_score,
+            "description": vuln["descriptions"][0]["value"]
+        }
+    except Exception as e:
+        print(f"  [WARN] Failed to fetch NVD details for {cve_id}: {e}. Using fallback defaults.")
+        is_kev = cve_id in kev_ids
+        cvss_score = 7.5
+        risk_score = round(cvss_score + (2.0 if is_kev else 0), 2)
+        return {
+            "cve_id":      cve_id,
+            "cvss_score":  cvss_score,
+            "severity":    "high",
+            "is_kev":      is_kev,
+            "risk_score":  risk_score,
+            "description": f"Security vulnerability {cve_id}."
+        }
 
 def parse_nmap_xml(filepath):
     print(f"\nParsing {filepath}...")
