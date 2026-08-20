@@ -12,4 +12,5 @@ export const config = {
   supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
   port: parseInt(process.env.PORT || "8000"),
   groqApiKey: required("GROQ_API_KEY"),
+  groqModel: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
 };

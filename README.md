@@ -64,7 +64,7 @@ Unlike traditional vulnerability scanners that simply list CVEs, VYUHA.AI correl
 
 ## AI & Threat Intelligence
 
-- Groq (Llama 3.3)
+- Groq (Llama 3.3)-openai/gpt-oss-120b
 - ChromaDB
 - NetworkX
 - NVD API
