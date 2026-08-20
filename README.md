@@ -207,7 +207,7 @@ This starts:
 
 ## Deployed Services
 - **Frontend App**: https://vyuha-ai-virid.vercel.app
-- **Backend Service**: https://vyuha-backend.onrender.com (or your configured Render URL)
+- **Backend Service**: https://vyuha-backend.onrender.com 
 
 ## Backend Deployment (Render)
 1. **New Web Service**: Connect your GitHub repository to a new Render web service.
